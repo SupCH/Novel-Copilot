@@ -1,0 +1,46 @@
+# dependencies
+node_modules/
+.pnpm-store/
+
+# python
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+venv/
+.venv/
+*.egg-info/
+
+# database
+*.db
+*.sqlite
+data/*.db
+
+# environment
+.env
+.env.local
+.env.*.local
+
+# next.js
+.next/
+out/
+build/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# logs
+*.log
+npm-debug.log*
+
+# misc
+.DS_Store
+Thumbs.db
+*.lnk
+
+# test
+coverage/
+.nyc_output/
