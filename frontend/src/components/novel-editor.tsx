@@ -128,9 +128,16 @@ export function NovelEditor() {
                 pendingContent
             );
 
-            // 2. 插入清理后的内容到编辑器
+            // 2. 将换行符转换为 HTML 段落格式
+            const htmlContent = cleanContent
+                .split('\n\n')
+                .filter(p => p.trim())
+                .map(p => `<p>${p.replace(/\n/g, '<br>')}</p>`)
+                .join('');
+
+            // 3. 插入格式化后的内容到编辑器
             editor.commands.focus("end");
-            editor.commands.insertContent(cleanContent);
+            editor.commands.insertContent(htmlContent);
 
             // 3. 异步提取数据并更新表格（不阻塞用户操作）
             aiApi.extractData({
