@@ -5,12 +5,21 @@ import { useAppStore } from "@/store/app-store";
 import { dataTablesApi, DataTableResponse } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogDescription,
+    DialogFooter,
+} from "@/components/ui/dialog";
 import { Plus, Trash2 } from "lucide-react";
 
 export function RelationshipsTable() {
     const { currentProject, dataTablesRefreshKey } = useAppStore();
     const [table, setTable] = useState<DataTableResponse | null>(null);
     const [loading, setLoading] = useState(false);
+    const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
 
     // 加载社交关系表 (table_type = 2)
     useEffect(() => {
@@ -80,6 +89,19 @@ export function RelationshipsTable() {
         }
     }, [table]);
 
+    // 清空所有数据
+    const clearTable = useCallback(async () => {
+        if (!table) return;
+        setConfirmDialogOpen(false);
+
+        try {
+            await dataTablesApi.clear(table.id);
+            setTable({ ...table, rows: [] });
+        } catch (error) {
+            console.error("Failed to clear table:", error);
+        }
+    }, [table]);
+
     if (!currentProject) {
         return (
             <div className="p-4 text-center text-muted-foreground">
@@ -106,11 +128,44 @@ export function RelationshipsTable() {
 
     return (
         <div className="h-full overflow-auto p-3">
+            {/* 确认对话框 */}
+            <Dialog open={confirmDialogOpen} onOpenChange={setConfirmDialogOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>确认清空</DialogTitle>
+                        <DialogDescription>
+                            确定要清空 "社交关系表" 的所有数据吗？此操作不可恢复。
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setConfirmDialogOpen(false)}>
+                            取消
+                        </Button>
+                        <Button variant="destructive" onClick={clearTable}>
+                            确认清空
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
             <div className="flex items-center justify-between mb-3">
                 <h3 className="font-semibold text-sm">社交关系</h3>
-                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={addRow}>
-                    <Plus className="h-4 w-4" />
-                </Button>
+                <div className="flex gap-1">
+                    {table.rows.length > 0 && (
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-destructive hover:text-destructive"
+                            onClick={() => setConfirmDialogOpen(true)}
+                            title="清空所有"
+                        >
+                            <Trash2 className="h-4 w-4" />
+                        </Button>
+                    )}
+                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={addRow}>
+                        <Plus className="h-4 w-4" />
+                    </Button>
+                </div>
             </div>
 
             {table.rows.length === 0 ? (
@@ -173,3 +228,4 @@ export function RelationshipsTable() {
         </div>
     );
 }
+

@@ -5,6 +5,11 @@ import dynamic from "next/dynamic";
 import { useAppStore } from "@/store/app-store";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, PanelLeftClose, PanelRightClose, Settings } from "lucide-react";
+import {
+  ResizablePanelGroup,
+  ResizablePanel,
+  ResizableHandle,
+} from "@/components/ui/resizable";
 
 // 动态导入避免 SSR hydration 问题
 const ProjectSelector = dynamic(
@@ -26,9 +31,6 @@ const RightPanel = dynamic(
   () => import("@/components/right-panel").then((mod) => mod.RightPanel),
   { ssr: false }
 );
-
-// 直接导入 react-resizable-panels 避免类型问题
-import { Group as ResizablePanelGroup, Panel as ResizablePanel, Separator as ResizableHandle } from "react-resizable-panels";
 
 const SettingsDialog = dynamic(
   () => import("@/components/settings-dialog").then((mod) => mod.SettingsDialog),
@@ -123,7 +125,7 @@ export default function Home() {
 
       {/* 三栏布局 */}
       <div className="flex-1 overflow-hidden">
-        {/* @ts-expect-error - direction prop exists but types are incorrect */}
+        {/* @ts-ignore - direction prop exists but types are incorrect in react-resizable-panels */}
         <ResizablePanelGroup direction="horizontal">
           {/* 左侧栏 - 章节目录 */}
           {sidebarOpen && (
@@ -143,7 +145,6 @@ export default function Home() {
           {/* 右侧栏 - 设置/关系图 */}
           {rightPanelOpen && (
             <>
-              {/* @ts-expect-error - withHandle prop works at runtime */}
               <ResizableHandle withHandle />
               <ResizablePanel defaultSize={25} minSize={10}>
                 <RightPanel />

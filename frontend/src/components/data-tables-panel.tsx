@@ -5,15 +5,33 @@ import { useAppStore } from "@/store/app-store";
 import { dataTablesApi, DataTableResponse } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogDescription,
+    DialogFooter,
+} from "@/components/ui/dialog";
 import { ChevronDown, ChevronRight, Plus, Trash2 } from "lucide-react";
 
 export function DataTablesPanel() {
     const { currentProject, dataTablesRefreshKey } = useAppStore();
     const [tables, setTables] = useState<DataTableResponse[]>([]);
-    const [expandedTables, setExpandedTables] = useState<Set<number>>(new Set([1, 2])); // 默认展开角色和社交表
+    const [expandedTables, setExpandedTables] = useState<Set<number>>(new Set([1, 2]));
     const [loading, setLoading] = useState(false);
 
-    // 加载数据表 - 当 refreshKey 变化时也重新加载
+    // 确认对话框状态
+    const [confirmDialog, setConfirmDialog] = useState<{
+        open: boolean;
+        tableId: number;
+        tableName: string;
+    }>({ open: false, tableId: 0, tableName: "" });
+
+    // 清空所有对话框
+    const [clearAllDialogOpen, setClearAllDialogOpen] = useState(false);
+
+    // 加载数据表
     useEffect(() => {
         if (!currentProject) return;
 
@@ -53,12 +71,10 @@ export function DataTablesPanel() {
         }
         newRows[rowIndex] = { ...newRows[rowIndex], [colIndex]: value };
 
-        // 乐观更新
         setTables(prev => prev.map(t =>
             t.id === tableId ? { ...t, rows: newRows } : t
         ));
 
-        // 保存到后端 (debounced)
         try {
             await dataTablesApi.update(tableId, newRows);
         } catch (error) {
@@ -103,6 +119,34 @@ export function DataTablesPanel() {
         }
     }, [tables]);
 
+    // 清空整个表格
+    const clearTable = useCallback(async () => {
+        const { tableId } = confirmDialog;
+        setConfirmDialog({ open: false, tableId: 0, tableName: "" });
+
+        try {
+            await dataTablesApi.clear(tableId);
+            setTables(prev => prev.map(t =>
+                t.id === tableId ? { ...t, rows: [] } : t
+            ));
+        } catch (error) {
+            console.error("Failed to clear table:", error);
+        }
+    }, [confirmDialog]);
+
+    // 清空所有数据表
+    const clearAllTables = useCallback(async () => {
+        if (!currentProject) return;
+        setClearAllDialogOpen(false);
+
+        try {
+            await dataTablesApi.clearAll(currentProject.id);
+            setTables(prev => prev.map(t => ({ ...t, rows: [] })));
+        } catch (error) {
+            console.error("Failed to clear all tables:", error);
+        }
+    }, [currentProject]);
+
     if (!currentProject) {
         return (
             <div className="p-4 text-center text-muted-foreground">
@@ -121,25 +165,97 @@ export function DataTablesPanel() {
 
     return (
         <div className="h-full overflow-auto">
+            {/* 单个表格确认对话框 */}
+            <Dialog open={confirmDialog.open} onOpenChange={(open) => !open && setConfirmDialog({ open: false, tableId: 0, tableName: "" })}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>确认清空</DialogTitle>
+                        <DialogDescription>
+                            确定要清空 &quot;{confirmDialog.tableName}&quot; 的所有数据吗？此操作不可恢复。
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setConfirmDialog({ open: false, tableId: 0, tableName: "" })}>
+                            取消
+                        </Button>
+                        <Button variant="destructive" onClick={clearTable}>
+                            确认清空
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* 清空所有对话框 */}
+            <Dialog open={clearAllDialogOpen} onOpenChange={setClearAllDialogOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>确认清空所有数据</DialogTitle>
+                        <DialogDescription>
+                            确定要清空所有数据表吗？此操作将删除所有表格中的数据，不可恢复。
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setClearAllDialogOpen(false)}>
+                            取消
+                        </Button>
+                        <Button variant="destructive" onClick={clearAllTables}>
+                            清空所有
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* 页面头部 */}
+            <div className="p-3 pb-0 flex items-center justify-between">
+                <span className="text-sm font-medium">数据表</span>
+                {tables.some(t => t.rows.length > 0) && (
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-7 text-xs text-destructive hover:text-destructive"
+                        onClick={() => setClearAllDialogOpen(true)}
+                    >
+                        <Trash2 className="h-3 w-3 mr-1" />
+                        清空所有
+                    </Button>
+                )}
+            </div>
+
             <div className="p-3 space-y-2">
-                {/* 过滤掉 #2 社交关系表（它在"关系"标签页显示） */}
+                {/* 过滤掉 #2 社交关系表 */}
                 {tables.filter(t => t.table_type !== 2).map(table => (
                     <div key={table.id} className="border rounded-lg overflow-hidden">
                         {/* 表格头部 */}
-                        <button
-                            className="w-full px-3 py-2 flex items-center gap-2 bg-muted/50 hover:bg-muted text-left text-sm font-medium"
-                            onClick={() => toggleTable(table.table_type)}
-                        >
-                            {expandedTables.has(table.table_type) ? (
-                                <ChevronDown className="h-4 w-4" />
-                            ) : (
-                                <ChevronRight className="h-4 w-4" />
+                        <div className="flex items-center bg-muted/50 hover:bg-muted">
+                            <button
+                                className="flex-1 px-3 py-2 flex items-center gap-2 text-left text-sm font-medium"
+                                onClick={() => toggleTable(table.table_type)}
+                            >
+                                {expandedTables.has(table.table_type) ? (
+                                    <ChevronDown className="h-4 w-4" />
+                                ) : (
+                                    <ChevronRight className="h-4 w-4" />
+                                )}
+                                <span>#{table.table_type} {table.table_name}</span>
+                                <span className="text-xs text-muted-foreground ml-auto">
+                                    {table.rows.length} 条记录
+                                </span>
+                            </button>
+                            {table.rows.length > 0 && (
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 mr-1 text-destructive hover:text-destructive"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        setConfirmDialog({ open: true, tableId: table.id, tableName: table.table_name });
+                                    }}
+                                    title={`清空${table.table_name}`}
+                                >
+                                    <Trash2 className="h-4 w-4" />
+                                </Button>
                             )}
-                            <span>#{table.table_type} {table.table_name}</span>
-                            <span className="text-xs text-muted-foreground ml-auto">
-                                {table.rows.length} 条记录
-                            </span>
-                        </button>
+                        </div>
 
                         {/* 表格内容 */}
                         {expandedTables.has(table.table_type) && (

@@ -114,6 +114,48 @@ async def update_data_table(
     )
 
 
+@router.delete("/{table_id}/clear")
+async def clear_data_table(
+    table_id: int,
+    db: AsyncSession = Depends(get_db)
+):
+    """清空数据表的所有行"""
+    result = await db.execute(select(DataTable).where(DataTable.id == table_id))
+    table = result.scalar_one_or_none()
+    
+    if not table:
+        raise HTTPException(status_code=404, detail="Table not found")
+    
+    table.rows = []
+    await db.flush()
+    await db.refresh(table)
+    
+    info = TABLE_TYPES.get(table.table_type, {"name": "未知", "columns": []})
+    return {"message": f"已清空 {info['name']}", "table_id": table_id}
+
+
+@router.delete("/project/{project_id}/clear-all")
+async def clear_all_data_tables(
+    project_id: int,
+    db: AsyncSession = Depends(get_db)
+):
+    """清空项目的所有数据表"""
+    result = await db.execute(
+        select(DataTable).where(DataTable.project_id == project_id)
+    )
+    tables = result.scalars().all()
+    
+    cleared_count = 0
+    for table in tables:
+        if table.rows:  # 只清空有数据的表
+            table.rows = []
+            cleared_count += 1
+    
+    await db.flush()
+    return {"message": f"已清空 {cleared_count} 个数据表", "project_id": project_id}
+
+
+
 # 表格操作函数 - 供 AI 解析使用
 def apply_table_operations(tables: list[DataTable], operations: list[dict]) -> list[DataTable]:
     """

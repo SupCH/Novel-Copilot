@@ -289,16 +289,37 @@ export const aiApi = {
 };
 
 // 数据导入导出
+export interface ImportResult {
+    message: string;
+    project_id: number;
+    warnings: string[];
+}
+
 export const dataApi = {
     exportProject: async (projectId: number) => {
-        const res = await fetch(`${API_BASE}/api/data/export/${projectId}`);
+        const res = await fetch(`${API_BASE}/api/export/${projectId}`, {
+            credentials: "omit",
+        });
+        if (!res.ok) {
+            const error = await res.json().catch(() => ({ detail: res.statusText }));
+            throw new Error(error.detail || "Export failed");
+        }
         return res.json();
     },
-    importProject: (data: unknown) =>
-        request<Project>("/api/data/import", {
+    importProject: async (file: File): Promise<ImportResult> => {
+        const formData = new FormData();
+        formData.append("file", file);
+        const res = await fetch(`${API_BASE}/api/import`, {
             method: "POST",
-            body: JSON.stringify(data),
-        }),
+            credentials: "omit",
+            body: formData,
+        });
+        if (!res.ok) {
+            const error = await res.json().catch(() => ({ detail: res.statusText }));
+            throw new Error(error.detail || "Import failed");
+        }
+        return res.json();
+    },
 };
 
 // 数据表 API
@@ -318,5 +339,13 @@ export const dataTablesApi = {
         request<DataTableResponse>(`/api/data-tables/${tableId}`, {
             method: "PUT",
             body: JSON.stringify({ rows }),
+        }),
+    clear: (tableId: number) =>
+        request<{ message: string; table_id: number }>(`/api/data-tables/${tableId}/clear`, {
+            method: "DELETE",
+        }),
+    clearAll: (projectId: number) =>
+        request<{ message: string; project_id: number }>(`/api/data-tables/project/${projectId}/clear-all`, {
+            method: "DELETE",
         }),
 };

@@ -3,20 +3,21 @@
 """
 
 import json
+from urllib.parse import quote
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from fastapi.responses import JSONResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import get_db
-from models.schemas import Project, Character, Relationship, Chapter
+from models.schemas import Project, Character, Relationship, Chapter, DataTable
 
 router = APIRouter(prefix="/api", tags=["Import/Export"])
 
 
 @router.get("/export/{project_id}")
 async def export_project(project_id: int, db: AsyncSession = Depends(get_db)):
-    """导出项目为 JSON"""
+    """导出项目为 JSON（包含所有相关数据）"""
     # 获取项目
     result = await db.execute(select(Project).where(Project.id == project_id))
     project = result.scalar_one_or_none()
@@ -34,6 +35,10 @@ async def export_project(project_id: int, db: AsyncSession = Depends(get_db)):
     # 获取章节
     result = await db.execute(select(Chapter).where(Chapter.project_id == project_id).order_by(Chapter.rank))
     chapters = result.scalars().all()
+    
+    # 获取数据表
+    result = await db.execute(select(DataTable).where(DataTable.project_id == project_id))
+    data_tables = result.scalars().all()
     
     # 组装导出数据
     export_data = {
@@ -74,19 +79,29 @@ async def export_project(project_id: int, db: AsyncSession = Depends(get_db)):
             }
             for ch in chapters
         ],
+        "data_tables": [
+            {
+                "table_type": dt.table_type,
+                "rows": dt.rows,
+            }
+            for dt in data_tables
+        ],
     }
+    
+    # URL 编码文件名以支持中文等特殊字符
+    encoded_filename = quote(f"{project.title}.json")
     
     return JSONResponse(
         content=export_data,
         headers={
-            "Content-Disposition": f"attachment; filename={project.title}.json"
+            "Content-Disposition": f"attachment; filename*=UTF-8''{encoded_filename}"
         }
     )
 
 
 @router.post("/import")
 async def import_project(file: UploadFile = File(...), db: AsyncSession = Depends(get_db)):
-    """从 JSON 导入项目"""
+    """从 JSON 导入项目（包含所有相关数据）"""
     try:
         content = await file.read()
         data = json.loads(content.decode("utf-8"))
@@ -97,8 +112,16 @@ async def import_project(file: UploadFile = File(...), db: AsyncSession = Depend
     if "project" not in data:
         raise HTTPException(status_code=400, detail="Missing 'project' field")
     
-    # 创建项目
+    # 收集警告信息
+    warnings = []
     project_data = data["project"]
+    
+    if not project_data.get("style"):
+        warnings.append("缺少写作风格(style)")
+    if not project_data.get("world_view"):
+        warnings.append("缺少世界观(world_view)")
+    
+    # 创建项目
     project = Project(
         title=project_data.get("title", "Imported Project"),
         description=project_data.get("description"),
@@ -153,7 +176,18 @@ async def import_project(file: UploadFile = File(...), db: AsyncSession = Depend
         )
         db.add(chapter)
     
+    # 创建数据表
+    for dt_data in data.get("data_tables", []):
+        data_table = DataTable(
+            project_id=project.id,
+            table_type=dt_data.get("table_type", 0),
+            rows=dt_data.get("rows", []),
+        )
+        db.add(data_table)
+    
     await db.flush()
     await db.refresh(project)
     
-    return {"message": "Import successful", "project_id": project.id}
+    return {"message": "Import successful", "project_id": project.id, "warnings": warnings}
+
+
