@@ -159,7 +159,14 @@ export function NovelEditor() {
 
     // 生成摘要
     const handleSummarize = useCallback(async () => {
-        if (!currentChapter || isSummarizing) return;
+        if (!currentChapter || isSummarizing || !editor) return;
+
+        // 检查章节是否有内容
+        const content = editor.getText()?.trim();
+        if (!content) {
+            alert("请先输入一些内容再生成摘要");
+            return;
+        }
 
         setIsSummarizing(true);
         try {
@@ -176,13 +183,14 @@ export function NovelEditor() {
             setCurrentChapter(updated);
 
             alert(`摘要已生成：\n\n${result.summary}`);
-        } catch (error) {
+        } catch (error: unknown) {
             console.error("Generate summary error:", error);
-            alert("生成摘要失败，请检查 AI 配置");
+            const message = error instanceof Error ? error.message : "请检查 AI 配置";
+            alert(`生成摘要失败：${message}`);
         } finally {
             setIsSummarizing(false);
         }
-    }, [currentChapter, isSummarizing, aiConfig, updateChapter, setCurrentChapter]);
+    }, [currentChapter, isSummarizing, aiConfig, updateChapter, setCurrentChapter, editor]);
 
     // 自动保存 (debounced)
     useEffect(() => {
@@ -207,7 +215,10 @@ export function NovelEditor() {
         if (!currentProject || !editor || isGenerating) return;
 
         const context = editor.getText();
-        // 允许空内容 - 后端会自动获取前章摘要作为上下文
+        if (!context.trim()) {
+            alert("请先输入一些内容");
+            return;
+        }
 
         setIsGenerating(true);
         setPendingContent("");
