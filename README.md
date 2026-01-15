@@ -7,28 +7,34 @@
 
 > 🚀 **隐私优先、本地化、可视化** 的 AI 小说创作辅助平台
 
-![Novel-Copilot Demo](https://via.placeholder.com/800x400?text=Novel-Copilot+Demo)
-
 ## ✨ 功能特性
 
+### 核心功能
 - **🤖 AI 智能续写** - 支持 OpenAI API / Ollama 本地模型，流式输出
 - **📊 自动数据提取** - AI 自动识别角色、事件、关系并填充数据表
-- **👥 社交关系管理** - 可视化管理角色间的关系网络
 - **📝 富文本编辑器** - 基于 Tiptap 的沉浸式写作体验
-- **📁 多项目管理** - 章节目录树，支持拖拽排序
-- **📤 导入/导出** - 完整项目数据 JSON 导入导出，便于备份迁移
-- **🗑️ 数据管理** - 一键清空单个或全部数据表
+- **📁 多项目管理** - 每个项目独立 URL（`/project/[id]`），章节目录树，支持拖拽排序
 - **💾 本地存储** - SQLite 数据库，数据完全本地化
-- **🌙 深色模式** - 护眼的写作界面
+
+### 人物关系系统
+- **👥 人物关系图** - 可视化角色关系网络（基于 React Flow）
+- **🔍 角色名高亮** - 编辑器中自动标记人物名，单击查看详情
+- **⚡ 一键整理** - AI 扫描全文自动合并人物、补充信息、生成关系
+
+### 数据管理
+- **📤 导入/导出** - 完整项目数据 JSON 导入导出，便于备份迁移
+- **🗑️ 数据清理** - 一键清空单个或全部数据表
+- **📝 右键菜单** - 选中文字后右键可进行 AI 重写、精简、扩写等操作
 
 ## 🛠️ 技术栈
 
 | 前端 | 后端 |
 |------|------|
-| Next.js 14+ | FastAPI |
+| Next.js 16+ | FastAPI |
 | Tailwind CSS + Shadcn/UI | SQLAlchemy (Async) |
 | Tiptap Editor | SQLite |
 | Zustand | OpenAI SDK |
+| React Flow | Pydantic |
 
 ## 📦 快速开始
 
@@ -94,18 +100,36 @@ npm run dev -- -p 3505
 Novel-Copilot/
 ├── backend/
 │   ├── main.py              # FastAPI 入口
-│   ├── models/              # 数据模型
-│   ├── routers/             # API 路由
-│   ├── services/            # 业务逻辑 (AI 服务等)
+│   ├── models/              # 数据模型 (schemas, dto)
+│   ├── routers/             # API 路由 (projects, chapters, ai, data-tables)
+│   ├── services/            # 业务逻辑 (AI 服务)
 │   └── data/                # SQLite 数据库
 ├── frontend/
 │   ├── app/                 # Next.js 页面
+│   │   ├── page.tsx         # 首页（项目列表）
+│   │   └── project/[id]/    # 项目编辑页（动态路由）
 │   ├── components/          # React 组件
-│   ├── lib/                 # API 客户端
-│   └── store/               # Zustand 状态
+│   │   ├── novel-editor.tsx # 主编辑器
+│   │   ├── character-graph.tsx # 人物关系图
+│   │   └── ...
+│   ├── lib/                 # API 客户端、工具函数
+│   └── store/               # Zustand 状态管理
 ├── start.ps1                # Windows 启动脚本
 └── README.md
 ```
+
+## 🔗 API 端点
+
+| 端点 | 方法 | 说明 |
+|------|------|------|
+| `/api/projects` | GET/POST | 项目列表/创建 |
+| `/api/chapters` | GET/POST | 章节管理 |
+| `/api/data-tables` | GET/POST | 数据表管理 |
+| `/api/ai/continue` | POST | AI 续写（SSE） |
+| `/api/ai/extract` | POST | AI 数据提取 |
+| `/api/ai/organize-characters` | POST | AI 一键整理人物关系 |
+| `/api/data/export/{id}` | GET | 导出项目 |
+| `/api/data/import` | POST | 导入项目 |
 
 ## 🤝 贡献
 

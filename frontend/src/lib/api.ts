@@ -250,6 +250,23 @@ export const aiApi = {
             }),
         });
     },
+
+    modifyText: (data: {
+        text: string;
+        action: string;
+        config?: { baseUrl?: string; apiKey?: string; model?: string }
+    }) => {
+        return request<{ success: boolean; result?: string; error?: string }>("/api/ai/modify", {
+            method: "POST",
+            body: JSON.stringify({
+                text: data.text,
+                action: data.action,
+                model: data.config?.model || "gpt-4o-mini",
+                api_base: data.config?.baseUrl || undefined,
+                api_key: data.config?.apiKey || undefined,
+            }),
+        });
+    },
     getModels: (config: { baseUrl: string; apiKey: string }) => {
         return request<{ models: string[] }>("/api/ai/models", {
             method: "POST",
@@ -281,6 +298,40 @@ export const aiApi = {
                 project_id: data.projectId,
                 content: data.content,
                 model: modelToUse,
+                api_base: data.config?.baseUrl || undefined,
+                api_key: data.config?.apiKey || undefined,
+            }),
+        });
+    },
+    testExtractModel: (data: {
+        model: string;
+        config?: { baseUrl?: string; apiKey?: string };
+    }) => {
+        return request<{ success: boolean; message: string; response: string | null }>(
+            "/api/ai/test-extract", {
+            method: "POST",
+            body: JSON.stringify({
+                model: data.model,
+                api_base: data.config?.baseUrl || undefined,
+                api_key: data.config?.apiKey || undefined,
+            }),
+        }
+        );
+    },
+    organizeCharacters: (data: {
+        projectId: number;
+        config?: { baseUrl?: string; apiKey?: string; model?: string };
+    }) => {
+        return request<{
+            success: boolean;
+            message: string;
+            characters_count?: number;
+            relationships_count?: number;
+        }>("/api/ai/organize-characters", {
+            method: "POST",
+            body: JSON.stringify({
+                project_id: data.projectId,
+                model: data.config?.model || "gpt-4o-mini",
                 api_base: data.config?.baseUrl || undefined,
                 api_key: data.config?.apiKey || undefined,
             }),

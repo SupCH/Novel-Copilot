@@ -188,3 +188,16 @@
 .react-flow__node {
   font-family: inherit;
 }
+
+/* Character name highlighting - clickable */
+.character-name {
+  cursor: pointer !important;
+  border-bottom: 1px solid #888;
+  padding-bottom: 1px;
+  transition: background-color 0.15s ease;
+}
+
+.character-name:hover {
+  background-color: rgba(59, 130, 246, 0.1);
+  border-bottom-color: #3b82f6;
+}

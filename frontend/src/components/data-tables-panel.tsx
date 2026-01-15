@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useAppStore } from "@/store/app-store";
-import { dataTablesApi, DataTableResponse } from "@/lib/api";
+import { dataTablesApi, aiApi, DataTableResponse } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -13,13 +13,16 @@ import {
     DialogDescription,
     DialogFooter,
 } from "@/components/ui/dialog";
-import { ChevronDown, ChevronRight, Plus, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronRight, Plus, Trash2, RefreshCw, Check, X, Network, Sparkles } from "lucide-react";
+import { CharacterGraph } from "@/components/character-graph";
 
 export function DataTablesPanel() {
-    const { currentProject, dataTablesRefreshKey } = useAppStore();
+    const { currentProject, currentChapter, aiConfig, dataTablesRefreshKey, refreshDataTables } = useAppStore();
     const [tables, setTables] = useState<DataTableResponse[]>([]);
     const [expandedTables, setExpandedTables] = useState<Set<number>>(new Set([1, 2]));
     const [loading, setLoading] = useState(false);
+    const [isExtracting, setIsExtracting] = useState(false);
+    const [extractResult, setExtractResult] = useState<{ success: boolean; message: string } | null>(null);
 
     // 确认对话框状态
     const [confirmDialog, setConfirmDialog] = useState<{
@@ -30,6 +33,13 @@ export function DataTablesPanel() {
 
     // 清空所有对话框
     const [clearAllDialogOpen, setClearAllDialogOpen] = useState(false);
+
+    // 关系图弹窗
+    const [graphOpen, setGraphOpen] = useState(false);
+
+    // 一键整理状态
+    const [isOrganizing, setIsOrganizing] = useState(false);
+    const [organizeResult, setOrganizeResult] = useState<{ success: boolean; message: string } | null>(null);
 
     // 加载数据表
     useEffect(() => {
@@ -164,7 +174,8 @@ export function DataTablesPanel() {
     }
 
     return (
-        <div className="h-full overflow-auto">
+        <div className="h-full flex flex-col">
+            {/* 固定头部 */}
             {/* 单个表格确认对话框 */}
             <Dialog open={confirmDialog.open} onOpenChange={(open) => !open && setConfirmDialog({ open: false, tableId: 0, tableName: "" })}>
                 <DialogContent>
@@ -208,6 +219,90 @@ export function DataTablesPanel() {
             {/* 页面头部 */}
             <div className="p-3 pb-0 flex items-center justify-between">
                 <span className="text-sm font-medium">数据表</span>
+                <div className="flex gap-1">
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-7 text-xs gap-1"
+                        onClick={() => setGraphOpen(true)}
+                        title="查看人物关系图"
+                    >
+                        <Network className="h-3 w-3" />
+                        关系图
+                    </Button>
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-7 text-xs gap-1"
+                        disabled={isOrganizing}
+                        onClick={async () => {
+                            if (!currentProject) return;
+                            setIsOrganizing(true);
+                            setOrganizeResult(null);
+                            try {
+                                const result = await aiApi.organizeCharacters({
+                                    projectId: currentProject.id,
+                                    config: aiConfig,
+                                });
+                                refreshDataTables();
+                                setOrganizeResult({ success: result.success, message: result.message });
+                            } catch (error) {
+                                console.error('Organize error:', error);
+                                setOrganizeResult({ success: false, message: '整理失败' });
+                            } finally {
+                                setIsOrganizing(false);
+                                setTimeout(() => setOrganizeResult(null), 3000);
+                            }
+                        }}
+                        title="AI 一键整理人物关系"
+                    >
+                        {isOrganizing ? <RefreshCw className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
+                        {isOrganizing ? "整理中..." : "一键整理"}
+                    </Button>
+                </div>
+            </div>
+            <div className="p-3 pt-2 flex gap-2">
+                {currentChapter && (
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-7 text-xs"
+                        disabled={isExtracting}
+                        onClick={async () => {
+                            if (!currentProject || !currentChapter) return;
+                            setIsExtracting(true);
+                            setExtractResult(null);
+                            try {
+                                const content = currentChapter.content?.replace(/<[^>]*>/g, '') || '';
+                                if (!content.trim()) {
+                                    setExtractResult({ success: false, message: '当前章节没有内容' });
+                                    return;
+                                }
+                                const result = await aiApi.extractData({
+                                    projectId: currentProject.id,
+                                    content,
+                                    config: aiConfig,
+                                });
+                                refreshDataTables();
+                                if (result.total > 0) {
+                                    setExtractResult({ success: true, message: `提取成功，更新了 ${result.total} 条数据` });
+                                } else {
+                                    setExtractResult({ success: true, message: '提取完成，未发现新数据' });
+                                }
+                            } catch (err: unknown) {
+                                console.error('重新提取失败:', err);
+                                const message = err instanceof Error ? err.message : '未知错误';
+                                setExtractResult({ success: false, message: `提取失败: ${message}` });
+                            } finally {
+                                setIsExtracting(false);
+                                setTimeout(() => setExtractResult(null), 3000);
+                            }
+                        }}
+                    >
+                        <RefreshCw className={`h-3 w-3 mr-1 ${isExtracting ? 'animate-spin' : ''}`} />
+                        {isExtracting ? '提取中...' : '重新提取'}
+                    </Button>
+                )}
                 {tables.some(t => t.rows.length > 0) && (
                     <Button
                         variant="outline"
@@ -221,106 +316,140 @@ export function DataTablesPanel() {
                 )}
             </div>
 
-            <div className="p-3 space-y-2">
-                {/* 过滤掉 #2 社交关系表 */}
-                {tables.filter(t => t.table_type !== 2).map(table => (
-                    <div key={table.id} className="border rounded-lg overflow-hidden">
-                        {/* 表格头部 */}
-                        <div className="flex items-center bg-muted/50 hover:bg-muted">
-                            <button
-                                className="flex-1 px-3 py-2 flex items-center gap-2 text-left text-sm font-medium"
-                                onClick={() => toggleTable(table.table_type)}
-                            >
-                                {expandedTables.has(table.table_type) ? (
-                                    <ChevronDown className="h-4 w-4" />
-                                ) : (
-                                    <ChevronRight className="h-4 w-4" />
-                                )}
-                                <span>#{table.table_type} {table.table_name}</span>
-                                <span className="text-xs text-muted-foreground ml-auto">
-                                    {table.rows.length} 条记录
-                                </span>
-                            </button>
-                            {table.rows.length > 0 && (
-                                <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-8 w-8 mr-1 text-destructive hover:text-destructive"
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        setConfirmDialog({ open: true, tableId: table.id, tableName: table.table_name });
-                                    }}
-                                    title={`清空${table.table_name}`}
-                                >
-                                    <Trash2 className="h-4 w-4" />
-                                </Button>
-                            )}
-                        </div>
+            {/* 内容区域 - 嵌套容器实现底部固定横向滚动条 */}
+            <div className="flex-1 flex flex-col min-h-0">
+                {/* 横向滚动容器 - 固定在底部 */}
+                <div className="flex-1 overflow-x-auto overflow-y-hidden">
+                    {/* 纵向滚动容器 */}
+                    <div className="h-full overflow-y-auto p-3 space-y-2" style={{ minWidth: 'max-content' }}>
+                        {/* 过滤掉 #2 社交关系表 */}
+                        {tables.filter(t => t.table_type !== 2).map(table => (
+                            <div key={table.id} className="border rounded-lg overflow-hidden" style={{ minWidth: '600px' }}>
+                                {/* 表格头部 */}
+                                <div className="flex items-center bg-muted/50 hover:bg-muted">
+                                    <button
+                                        className="flex-1 px-3 py-2 flex items-center gap-2 text-left text-sm font-medium"
+                                        onClick={() => toggleTable(table.table_type)}
+                                    >
+                                        {expandedTables.has(table.table_type) ? (
+                                            <ChevronDown className="h-4 w-4" />
+                                        ) : (
+                                            <ChevronRight className="h-4 w-4" />
+                                        )}
+                                        <span>#{table.table_type} {table.table_name}</span>
+                                        <span className="text-xs text-muted-foreground ml-auto">
+                                            {table.rows.length} 条记录
+                                        </span>
+                                    </button>
+                                    {table.rows.length > 0 && (
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-8 w-8 mr-1 text-destructive hover:text-destructive"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setConfirmDialog({ open: true, tableId: table.id, tableName: table.table_name });
+                                            }}
+                                            title={`清空${table.table_name}`}
+                                        >
+                                            <Trash2 className="h-4 w-4" />
+                                        </Button>
+                                    )}
+                                </div>
 
-                        {/* 表格内容 */}
-                        {expandedTables.has(table.table_type) && (
-                            <div className="p-2">
-                                {table.rows.length === 0 ? (
-                                    <div className="text-sm text-muted-foreground text-center py-2">
-                                        暂无数据
-                                    </div>
-                                ) : (
-                                    <div className="overflow-x-auto">
-                                        <table className="w-full text-xs">
-                                            <thead>
-                                                <tr className="border-b">
-                                                    {table.columns.map((col, i) => (
-                                                        <th key={i} className="px-2 py-1 text-left font-medium text-muted-foreground whitespace-nowrap">
-                                                            {col}
-                                                        </th>
-                                                    ))}
-                                                    <th className="w-8"></th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {table.rows.map((row, rowIndex) => (
-                                                    <tr key={rowIndex} className="border-b last:border-b-0 group">
-                                                        {table.columns.map((_, colIndex) => (
-                                                            <td key={colIndex} className="px-1 py-1 min-w-[100px] align-top">
-                                                                <textarea
-                                                                    value={row[colIndex] || ""}
-                                                                    onChange={(e) => updateCell(table.id, table.table_type, rowIndex, colIndex, e.target.value)}
-                                                                    className="w-full text-xs bg-transparent resize-none border-0 focus:ring-1 focus:ring-primary rounded p-1"
-                                                                    rows={2}
-                                                                    title={row[colIndex] || ""}
-                                                                />
-                                                            </td>
+                                {/* 表格内容 */}
+                                {expandedTables.has(table.table_type) && (
+                                    <div className="p-2">
+                                        {table.rows.length === 0 ? (
+                                            <div className="text-sm text-muted-foreground text-center py-2">
+                                                暂无数据
+                                            </div>
+                                        ) : (
+                                            <div className="overflow-x-auto">
+                                                <table className="w-full text-xs border-collapse border">
+                                                    <thead>
+                                                        <tr className="border-b">
+                                                            {table.columns.map((col, i) => (
+                                                                <th key={i} className="px-2 py-1 text-left font-medium text-muted-foreground whitespace-nowrap border">
+                                                                    {col}
+                                                                </th>
+                                                            ))}
+                                                            <th className="w-8 border"></th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {table.rows.map((row, rowIndex) => (
+                                                            <tr key={rowIndex} className="border-b last:border-b-0 group">
+                                                                {table.columns.map((_, colIndex) => (
+                                                                    <td key={colIndex} className="px-1 py-1 min-w-[100px] align-top border">
+                                                                        <textarea
+                                                                            value={row[colIndex] || ""}
+                                                                            onChange={(e) => updateCell(table.id, table.table_type, rowIndex, colIndex, e.target.value)}
+                                                                            className="w-full text-xs bg-transparent resize-none border-0 focus:ring-1 focus:ring-primary rounded p-1"
+                                                                            rows={2}
+                                                                            title={row[colIndex] || ""}
+                                                                        />
+                                                                    </td>
+                                                                ))}
+                                                                <td className="px-1 border">
+                                                                    <Button
+                                                                        variant="ghost"
+                                                                        size="icon"
+                                                                        className="h-6 w-6 opacity-0 group-hover:opacity-100"
+                                                                        onClick={() => deleteRow(table.id, rowIndex)}
+                                                                    >
+                                                                        <Trash2 className="h-3 w-3 text-destructive" />
+                                                                    </Button>
+                                                                </td>
+                                                            </tr>
                                                         ))}
-                                                        <td className="px-1">
-                                                            <Button
-                                                                variant="ghost"
-                                                                size="icon"
-                                                                className="h-6 w-6 opacity-0 group-hover:opacity-100"
-                                                                onClick={() => deleteRow(table.id, rowIndex)}
-                                                            >
-                                                                <Trash2 className="h-3 w-3 text-destructive" />
-                                                            </Button>
-                                                        </td>
-                                                    </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        )}
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            className="w-full mt-1 text-xs h-7"
+                                            onClick={() => addRow(table.id, table.columns)}
+                                        >
+                                            <Plus className="h-3 w-3 mr-1" />
+                                            添加行
+                                        </Button>
                                     </div>
                                 )}
-                                <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="w-full mt-1 text-xs h-7"
-                                    onClick={() => addRow(table.id, table.columns)}
-                                >
-                                    <Plus className="h-3 w-3 mr-1" />
-                                    添加行
-                                </Button>
                             </div>
-                        )}
+                        ))}
                     </div>
-                ))}
+                </div>
             </div>
+
+            {/* 提取中提示 */}
+            {isExtracting && (
+                <div className="fixed bottom-4 right-4 bg-blue-500 text-white px-4 py-2 rounded-lg shadow-lg flex items-center gap-2 animate-in fade-in slide-in-from-bottom-4 z-50">
+                    <RefreshCw className="h-4 w-4 animate-spin" />
+                    <span className="text-sm">正在总结数据...</span>
+                </div>
+            )}
+
+            {/* 提取结果提示 */}
+            {extractResult && !isExtracting && (
+                <div className={`fixed bottom-4 right-4 ${extractResult.success ? 'bg-green-500' : 'bg-red-500'} text-white px-4 py-2 rounded-lg shadow-lg flex items-center gap-2 animate-in fade-in slide-in-from-bottom-4 z-50 max-w-md`}>
+                    {extractResult.success ? <Check className="h-4 w-4 flex-shrink-0" /> : <X className="h-4 w-4 flex-shrink-0" />}
+                    <span className="text-sm">{extractResult.message}</span>
+                </div>
+            )}
+
+            {/* 整理结果提示 */}
+            {organizeResult && !isOrganizing && (
+                <div className={`fixed bottom-4 right-4 ${organizeResult.success ? 'bg-green-500' : 'bg-red-500'} text-white px-4 py-2 rounded-lg shadow-lg flex items-center gap-2 animate-in fade-in slide-in-from-bottom-4 z-50 max-w-md`}>
+                    {organizeResult.success ? <Check className="h-4 w-4 flex-shrink-0" /> : <X className="h-4 w-4 flex-shrink-0" />}
+                    <span className="text-sm">{organizeResult.message}</span>
+                </div>
+            )}
+
+            {/* 关系图弹窗 */}
+            <CharacterGraph isOpen={graphOpen} onClose={() => setGraphOpen(false)} />
         </div>
     );
 }

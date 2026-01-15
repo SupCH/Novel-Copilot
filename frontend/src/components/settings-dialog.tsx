@@ -27,18 +27,29 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
     const [checkStatus, setCheckStatus] = useState<"idle" | "success" | "error">("idle");
     const [errorMessage, setErrorMessage] = useState("");
 
+    // 模型测试状态
+    const [isTestingModel, setIsTestingModel] = useState(false);
+    const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
+
     // 当 store 更新或对话框打开时，同步状态
     useEffect(() => {
         if (open) {
             setConfig(aiConfig);
             setCheckStatus("idle");
             setErrorMessage("");
+            setTestResult(null);
         }
     }, [open, aiConfig]);
 
     const handleSave = () => {
         setAiConfig(config);
         onOpenChange(false);
+    };
+
+    const handleApply = () => {
+        setAiConfig(config);
+        // 显示应用成功反馈
+        setTestResult({ success: true, message: "设置已应用" });
     };
 
     const handleCheckConnection = async () => {
@@ -55,9 +66,15 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
             setAvailableModels(models);
             setCheckStatus("success");
 
-            // 如果当前没有设置模型，且获取到了模型列表，默认选中第一个
-            if (!config.model && models.length > 0) {
-                setConfig(prev => ({ ...prev, model: models[0] }));
+            // 如果当前模型不在新列表中，或者没有设置模型，则自动选中第一个
+            if (models.length > 0) {
+                if (!config.model || !models.includes(config.model)) {
+                    setConfig(prev => ({ ...prev, model: models[0] }));
+                }
+                // 同样处理提取模型
+                if (config.extractModel && !models.includes(config.extractModel)) {
+                    setConfig(prev => ({ ...prev, extractModel: models[0] }));
+                }
             }
         } catch (error) {
             console.error("Connection check failed:", error);
@@ -65,6 +82,40 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
             setErrorMessage(error instanceof Error ? error.message : "连接失败");
         } finally {
             setIsChecking(false);
+        }
+    };
+
+    const handleTestModel = async () => {
+        // 确定要测试的模型：优先使用提取模型，否则使用续写模型
+        const modelToTest = config.extractModel || config.model;
+        if (!modelToTest) {
+            setTestResult({ success: false, message: "请先选择或输入模型名称" });
+            return;
+        }
+
+        setIsTestingModel(true);
+        setTestResult(null);
+
+        try {
+            const result = await aiApi.testExtractModel({
+                model: modelToTest,
+                config: {
+                    baseUrl: config.baseUrl,
+                    apiKey: config.apiKey,
+                }
+            });
+
+            setTestResult({
+                success: result.success,
+                message: result.success ? "模型兼容数据提取" : (result.message || "测试失败"),
+            });
+        } catch (error) {
+            setTestResult({
+                success: false,
+                message: error instanceof Error ? error.message : "测试请求失败",
+            });
+        } finally {
+            setIsTestingModel(false);
         }
     };
 
@@ -206,7 +257,27 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                                 用于分析内容并自动填充数据表，建议使用非流式模型
                             </p>
                         </div>
+                        <div className="flex justify-end col-start-2 col-span-3 mt-1 gap-2 items-center">
+                            {testResult && (
+                                <span className={`text-xs flex items-center ${testResult.success ? 'text-green-600' : 'text-red-600'}`}>
+                                    {testResult.success ? <CheckCircle2 className="h-3 w-3 mr-1" /> : <XCircle className="h-3 w-3 mr-1" />}
+                                    {testResult.message}
+                                </span>
+                            )}
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="h-7 text-xs"
+                                onClick={handleTestModel}
+                                disabled={isTestingModel}
+                            >
+                                {isTestingModel && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}
+                                测试提取能力
+                            </Button>
+                        </div>
                     </div>
+
 
                     <div className="grid grid-cols-4 items-center gap-4">
                         <Label htmlFor="max-tokens" className="text-right">
@@ -226,17 +297,20 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                                 className="w-24"
                             />
                             <span className="text-sm text-muted-foreground">
-                                tokens（约 {Math.round(config.maxTokens * 0.7)} 汉字）
+                                字（约 {config.maxTokens} tokens）
                             </span>
                         </div>
                     </div>
                 </div>
-                <DialogFooter>
+                <DialogFooter className="gap-2">
+                    <Button type="button" variant="outline" onClick={handleApply}>
+                        应用设置
+                    </Button>
                     <Button type="submit" onClick={handleSave}>
-                        保存设置
+                        保存并关闭
                     </Button>
                 </DialogFooter>
             </DialogContent>
-        </Dialog>
+        </Dialog >
     );
 }

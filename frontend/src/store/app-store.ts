@@ -63,7 +63,12 @@ export const useAppStore = create<AppState>()(
         (set) => ({
             // 项目
             currentProject: null,
-            setCurrentProject: (project) => set({ currentProject: project }),
+            setCurrentProject: (project) => set({
+                currentProject: project,
+                // 切换项目时清除章节状态
+                chapters: [],
+                currentChapter: null,
+            }),
 
             // 章节
             chapters: [],

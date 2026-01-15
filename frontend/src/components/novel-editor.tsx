@@ -1,13 +1,16 @@
 "use client";
 
-import { useEffect, useCallback, useState } from "react";
+import { useEffect, useCallback, useState, useMemo } from "react";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
 import { useAppStore } from "@/store/app-store";
-import { chaptersApi, aiApi } from "@/lib/api";
+import { chaptersApi, aiApi, dataTablesApi } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Sparkles, Save, Check, RefreshCw, X } from "lucide-react";
+import { ContextMenu, getEditorContextMenuItems } from "@/components/context-menu";
+import { CharacterHoverCard, CharacterData } from "@/components/character-hover-card";
+import { CharacterHighlight, updateCharacterNames } from "@/lib/character-highlight";
 
 export function NovelEditor() {
     const {
@@ -19,23 +22,36 @@ export function NovelEditor() {
         setIsGenerating,
         aiConfig,
         refreshDataTables,
+        dataTablesRefreshKey,
     } = useAppStore();
 
     // AI 生成的待确认内容
     const [pendingContent, setPendingContent] = useState<string | null>(null);
-
     // 保存提示
     const [showSaveToast, setShowSaveToast] = useState(false);
+    // 数据提取状态
+    const [isExtracting, setIsExtracting] = useState(false);
+    const [extractResult, setExtractResult] = useState<{ success: boolean; message: string } | null>(null);
+    // 右键菜单状态
+    const [contextMenu, setContextMenu] = useState<{ x: number; y: number; selectedText: string } | null>(null);
+    // 人物悬停卡片状态
+    const [hoverCard, setHoverCard] = useState<{ name: string; x: number; y: number } | null>(null);
+    const [characterData, setCharacterData] = useState<CharacterData | null>(null);
+    const [characterNames, setCharacterNames] = useState<string[]>([]);
+
+    // 编辑器扩展配置
+    const editorExtensions = useMemo(() => [
+        StarterKit,
+        Placeholder.configure({
+            placeholder: "开始写作...\n\n输入内容后，点击 AI 续写按钮生成后续内容",
+        }),
+        CharacterHighlight,
+    ], []);
 
     const editor = useEditor({
-        extensions: [
-            StarterKit,
-            Placeholder.configure({
-                placeholder: "开始写作...\n\n输入内容后，点击 AI 续写按钮生成后续内容",
-            }),
-        ],
+        extensions: editorExtensions,
         content: currentChapter?.content || "",
-        immediatelyRender: false, // 避免 SSR hydration 不匹配
+        immediatelyRender: false,
         editorProps: {
             attributes: {
                 class:
@@ -48,9 +64,83 @@ export function NovelEditor() {
     useEffect(() => {
         if (editor && currentChapter) {
             editor.commands.setContent(currentChapter.content || "");
-            setPendingContent(null); // 清空待确认内容
+            setPendingContent(null);
         }
     }, [editor, currentChapter?.id]);
+
+    // 角色名列表更新时，更新全局变量并刷新视图
+    useEffect(() => {
+        if (characterNames.length > 0) {
+            console.log("[Editor] Updating character names:", characterNames.length);
+            updateCharacterNames(characterNames);
+            if (editor) {
+                editor.view.dispatch(editor.state.tr);
+            }
+        }
+    }, [editor, characterNames]);
+
+    // 获取角色名列表
+    useEffect(() => {
+        async function fetchCharacterNames() {
+            if (!currentProject) return;
+            try {
+                const tables = await dataTablesApi.list(currentProject.id);
+                const charactersTable = tables.find((t: { table_type: number }) => t.table_type === 1);
+                if (charactersTable && charactersTable.rows) {
+                    const names = charactersTable.rows
+                        .map((row: Record<number, string>) => row[0])
+                        .filter((name: string | undefined): name is string => !!name && name.length >= 2);
+                    setCharacterNames(names);
+                }
+            } catch (error) {
+                console.error("Failed to fetch character names:", error);
+            }
+        }
+        fetchCharacterNames();
+    }, [currentProject, dataTablesRefreshKey]);
+
+    // 加载角色数据的辅助函数
+    const loadCharacterData = useCallback(async (name: string, x: number, y: number) => {
+        if (!currentProject) return;
+        try {
+            const tables = await dataTablesApi.list(currentProject.id);
+            const charactersTable = tables.find((t: { table_type: number }) => t.table_type === 1);
+            const relationshipsTable = tables.find((t: { table_type: number }) => t.table_type === 2);
+
+            if (charactersTable) {
+                const row = charactersTable.rows.find((r: Record<number, string>) => r[0] === name);
+                if (row) {
+                    const charData: CharacterData = {
+                        name: row[0] || name,
+                        traits: row[1] || "",
+                        personality: row[2] || "",
+                        role: row[3] || "",
+                        hobbies: row[4] || "",
+                        likes: row[5] || "",
+                        residence: row[6] || "",
+                        other: row[7] || "",
+                        relationships: [],
+                    };
+
+                    if (relationshipsTable) {
+                        charData.relationships = relationshipsTable.rows
+                            .filter((r: Record<number, string>) => r[0] === name)
+                            .map((r: Record<number, string>) => ({
+                                name: r[1] || "",
+                                relation: r[2] || "",
+                                attitude: r[3] || "",
+                                affection: r[4] || "",
+                            }));
+                    }
+
+                    setCharacterData(charData);
+                    setHoverCard({ name, x, y });
+                }
+            }
+        } catch (error) {
+            console.error("Failed to load character data:", error);
+        }
+    }, [currentProject]);
 
     // 保存章节
     const handleSave = useCallback(async () => {
@@ -61,7 +151,6 @@ export function NovelEditor() {
         updateChapter(currentChapter.id, updated);
         setCurrentChapter(updated);
 
-        // 显示保存提示
         setShowSaveToast(true);
         setTimeout(() => setShowSaveToast(false), 2000);
     }, [currentChapter, editor, updateChapter, setCurrentChapter]);
@@ -71,7 +160,6 @@ export function NovelEditor() {
         if (!editor || !currentChapter) return;
 
         const handleUpdate = () => {
-            // 保存定时器 ID
             const timerId = setTimeout(() => {
                 handleSave();
             }, 2000);
@@ -85,7 +173,7 @@ export function NovelEditor() {
         };
     }, [editor, currentChapter, handleSave]);
 
-    // AI 续写 - 生成到 pending 状态
+    // AI 续写
     const handleAIContinue = useCallback(async () => {
         if (!currentProject || !editor || isGenerating) return;
 
@@ -96,7 +184,7 @@ export function NovelEditor() {
         }
 
         setIsGenerating(true);
-        setPendingContent(""); // 开始生成
+        setPendingContent("");
 
         try {
             let generated = "";
@@ -106,7 +194,7 @@ export function NovelEditor() {
                 config: aiConfig,
             })) {
                 generated += chunk;
-                setPendingContent(generated); // 实时更新预览
+                setPendingContent(generated);
             }
         } catch (error) {
             console.error("AI continue error:", error);
@@ -122,54 +210,54 @@ export function NovelEditor() {
         if (!editor || !pendingContent || !currentProject) return;
 
         try {
-            // 1. 清理内容（移除可能混入的代码）
             const { content: cleanContent } = await aiApi.processTableEdit(
                 currentProject.id,
                 pendingContent
             );
 
-            // 2. 将换行符转换为 HTML 段落格式
             const htmlContent = cleanContent
                 .split('\n\n')
                 .filter(p => p.trim())
                 .map(p => `<p>${p.replace(/\n/g, '<br>')}</p>`)
                 .join('');
 
-            // 3. 插入格式化后的内容到编辑器
             editor.commands.focus("end");
             editor.commands.insertContent(htmlContent);
 
-            // 3. 异步提取数据并更新表格（不阻塞用户操作）
+            setIsExtracting(true);
+            setExtractResult(null);
             aiApi.extractData({
                 projectId: currentProject.id,
                 content: cleanContent,
                 config: aiConfig,
             }).then(result => {
                 if (result.total > 0) {
-                    console.log(`自动提取数据: ${JSON.stringify(result.updates)}`);
-                    // 刷新数据表面板
                     refreshDataTables();
+                    setExtractResult({ success: true, message: `提取成功，更新了 ${result.total} 条数据` });
+                } else {
+                    setExtractResult({ success: true, message: "提取完成，未发现新数据" });
                 }
             }).catch(err => {
                 console.error("数据提取失败:", err);
+                setExtractResult({ success: false, message: `提取失败: ${err.message || '未知错误'}` });
+            }).finally(() => {
+                setIsExtracting(false);
+                setTimeout(() => setExtractResult(null), 3000);
             });
 
         } catch (error) {
             console.error("Failed to process content:", error);
-            // 如果处理失败，直接插入原始内容
             editor.commands.focus("end");
             editor.commands.insertContent(pendingContent);
         }
 
         setPendingContent(null);
-    }, [editor, pendingContent, currentProject, aiConfig]);
+    }, [editor, pendingContent, currentProject, aiConfig, refreshDataTables]);
 
-    // 拒绝 AI 生成的内容
     const handleReject = useCallback(() => {
         setPendingContent(null);
     }, []);
 
-    // 重新生成
     const handleRegenerate = useCallback(() => {
         setPendingContent(null);
         handleAIContinue();
@@ -232,9 +320,88 @@ export function NovelEditor() {
             </div>
 
             {/* 编辑器 */}
-            <div className="flex-1 overflow-auto">
+            <div
+                className="flex-1 overflow-auto"
+                onContextMenu={(e) => {
+                    e.preventDefault();
+                    const selectedText = editor?.state.selection.empty
+                        ? ""
+                        : editor?.state.doc.textBetween(
+                            editor.state.selection.from,
+                            editor.state.selection.to,
+                            " "
+                        ) || "";
+                    setContextMenu({ x: e.clientX, y: e.clientY, selectedText });
+                }}
+                onClick={async (e) => {
+                    // 检测是否单击在角色名 span 上
+                    const target = e.target as HTMLElement;
+                    const characterSpan = target.closest('.character-name') as HTMLElement;
+
+                    if (characterSpan) {
+                        const characterName = characterSpan.getAttribute('data-character-name') || characterSpan.textContent?.trim() || "";
+                        console.log("[Click] Clicked on character:", characterName);
+
+                        if (characterName && characterNames.includes(characterName)) {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            await loadCharacterData(characterName, e.clientX, e.clientY);
+                        }
+                    }
+                }}
+            >
                 <EditorContent editor={editor} className="h-full" />
             </div>
+
+            {/* 自定义右键菜单 */}
+            {contextMenu && (
+                <ContextMenu
+                    position={{ x: contextMenu.x, y: contextMenu.y }}
+                    items={getEditorContextMenuItems(
+                        contextMenu.selectedText,
+                        () => document.execCommand("copy"),
+                        () => document.execCommand("cut"),
+                        () => editor?.commands.focus() && document.execCommand("paste"),
+                        async (action, text) => {
+                            if (!editor) return;
+                            try {
+                                const response = await aiApi.modifyText({
+                                    text,
+                                    action,
+                                    config: aiConfig,
+                                });
+                                if (response.success && response.result) {
+                                    editor.commands.insertContent(response.result);
+                                } else {
+                                    alert(`修改失败: ${response.error || '未知错误'}`);
+                                }
+                            } catch (error) {
+                                console.error("AI modify error:", error);
+                                alert("AI 修改失败，请检查网络连接");
+                            }
+                        },
+                        characterNames,
+                        async (name) => {
+                            await loadCharacterData(name, contextMenu.x, contextMenu.y);
+                        }
+                    )}
+                    onClose={() => setContextMenu(null)}
+                />
+            )}
+
+            {/* 角色信息卡片 */}
+            {hoverCard && characterData && (
+                <CharacterHoverCard
+                    character={characterData}
+                    position={{ x: hoverCard.x, y: hoverCard.y }}
+                    onClose={() => { setHoverCard(null); setCharacterData(null); }}
+                    onSave={async (data) => {
+                        console.log("Save character data:", data);
+                        setHoverCard(null);
+                        setCharacterData(null);
+                    }}
+                />
+            )}
 
             {/* AI 生成内容预览 */}
             {pendingContent !== null && (
@@ -253,30 +420,15 @@ export function NovelEditor() {
                     </div>
                     {!isGenerating && pendingContent && (
                         <div className="p-2 border-t flex items-center gap-2 bg-background">
-                            <Button
-                                size="sm"
-                                variant="default"
-                                onClick={handleAccept}
-                                className="gap-1"
-                            >
+                            <Button size="sm" variant="default" onClick={handleAccept} className="gap-1">
                                 <Check className="h-4 w-4" />
                                 接受
                             </Button>
-                            <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={handleRegenerate}
-                                className="gap-1"
-                            >
+                            <Button size="sm" variant="outline" onClick={handleRegenerate} className="gap-1">
                                 <RefreshCw className="h-4 w-4" />
                                 重新生成
                             </Button>
-                            <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={handleReject}
-                                className="gap-1 text-destructive hover:text-destructive"
-                            >
+                            <Button size="sm" variant="ghost" onClick={handleReject} className="gap-1 text-destructive hover:text-destructive">
                                 <X className="h-4 w-4" />
                                 拒绝
                             </Button>
@@ -290,6 +442,22 @@ export function NovelEditor() {
                 <div className="fixed bottom-4 right-4 bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg flex items-center gap-2 animate-in fade-in slide-in-from-bottom-4 z-50">
                     <Check className="h-4 w-4" />
                     <span>已保存</span>
+                </div>
+            )}
+
+            {/* 数据提取中提示 */}
+            {isExtracting && (
+                <div className="fixed bottom-4 right-4 bg-blue-500 text-white px-4 py-2 rounded-lg shadow-lg flex items-center gap-2 animate-in fade-in slide-in-from-bottom-4 z-50">
+                    <RefreshCw className="h-4 w-4 animate-spin" />
+                    <span>正在总结数据...</span>
+                </div>
+            )}
+
+            {/* 数据提取结果提示 */}
+            {extractResult && (
+                <div className={`fixed bottom-4 right-4 ${extractResult.success ? 'bg-green-500' : 'bg-red-500'} text-white px-4 py-2 rounded-lg shadow-lg flex items-center gap-2 animate-in fade-in slide-in-from-bottom-4 z-50`}>
+                    {extractResult.success ? <Check className="h-4 w-4" /> : <X className="h-4 w-4" />}
+                    <span>{extractResult.message}</span>
                 </div>
             )}
         </div>

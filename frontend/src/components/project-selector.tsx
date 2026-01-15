@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -19,6 +20,7 @@ import type { Project } from "@/lib/api";
 import { BookOpen, Plus, Trash2, Loader2, FileUp, FileDown, AlertTriangle } from "lucide-react";
 
 export function ProjectSelector() {
+    const router = useRouter();
     const { currentProject, setCurrentProject } = useAppStore();
     const [projects, setProjects] = useState<Project[]>([]);
     const [dialogOpen, setDialogOpen] = useState(false);
@@ -54,7 +56,7 @@ export function ProjectSelector() {
                 style: newStyle.trim() || null,
             });
             setProjects([project, ...projects]);
-            setCurrentProject(project);
+            router.push(`/project/${project.id}`);
             setDialogOpen(false);
             resetForm();
         } catch (err) {
@@ -286,7 +288,7 @@ export function ProjectSelector() {
                     {projects.map((project) => (
                         <div
                             key={project.id}
-                            onClick={() => setCurrentProject(project)}
+                            onClick={() => router.push(`/project/${project.id}`)}
                             className={`
                 p-4 rounded-lg border cursor-pointer transition-all group
                 hover:border-primary hover:shadow-md
