@@ -11,6 +11,7 @@ import { Sparkles, Save, Check, RefreshCw, X, FileText } from "lucide-react";
 import { ContextMenu, getEditorContextMenuItems } from "@/components/context-menu";
 import { CharacterHoverCard, CharacterData } from "@/components/character-hover-card";
 import { CharacterHighlight, updateCharacterNames } from "@/lib/character-highlight";
+import { AlertDialog, InputDialog } from "@/components/ui/custom-dialog";
 
 export function NovelEditor() {
     const {
@@ -41,6 +42,11 @@ export function NovelEditor() {
     const [characterNames, setCharacterNames] = useState<string[]>([]);
     // 生成摘要状态
     const [isSummarizing, setIsSummarizing] = useState(false);
+    // 自定义修改对话框状态
+    const [customDialogOpen, setCustomDialogOpen] = useState(false);
+    const [customDialogText, setCustomDialogText] = useState("");
+    // Alert 对话框状态
+    const [alertDialog, setAlertDialog] = useState<{ open: boolean; title: string; message: string; type: "success" | "error" | "info" } | null>(null);
 
     // 编辑器扩展配置
     const editorExtensions = useMemo(() => [
@@ -329,6 +335,36 @@ export function NovelEditor() {
         handleAIContinue();
     }, [handleAIContinue]);
 
+    // AI 文字修改
+    const handleAIModify = useCallback(async (action: string, text: string) => {
+        if (!editor) return;
+        try {
+            const response = await aiApi.modifyText({
+                text,
+                action,
+                config: aiConfig,
+            });
+            if (response.success && response.result) {
+                editor.commands.insertContent(response.result);
+            } else {
+                setAlertDialog({
+                    open: true,
+                    title: "修改失败",
+                    message: response.error || "未知错误",
+                    type: "error",
+                });
+            }
+        } catch (error) {
+            console.error("AI modify error:", error);
+            setAlertDialog({
+                open: true,
+                title: "AI 修改失败",
+                message: "请检查网络连接和 AI 配置",
+                type: "error",
+            });
+        }
+    }, [editor, aiConfig]);
+
     // 快捷键
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
@@ -451,27 +487,14 @@ export function NovelEditor() {
                         () => document.execCommand("copy"),
                         () => document.execCommand("cut"),
                         () => editor?.commands.focus() && document.execCommand("paste"),
-                        async (action, text) => {
-                            if (!editor) return;
-                            try {
-                                const response = await aiApi.modifyText({
-                                    text,
-                                    action,
-                                    config: aiConfig,
-                                });
-                                if (response.success && response.result) {
-                                    editor.commands.insertContent(response.result);
-                                } else {
-                                    alert(`修改失败: ${response.error || '未知错误'}`);
-                                }
-                            } catch (error) {
-                                console.error("AI modify error:", error);
-                                alert("AI 修改失败，请检查网络连接");
-                            }
-                        },
+                        handleAIModify,
                         characterNames,
                         async (name) => {
                             await loadCharacterData(name, contextMenu.x, contextMenu.y);
+                        },
+                        () => {
+                            setCustomDialogText(contextMenu.selectedText);
+                            setCustomDialogOpen(true);
                         }
                     )}
                     onClose={() => setContextMenu(null)}
@@ -548,6 +571,31 @@ export function NovelEditor() {
                     {extractResult.success ? <Check className="h-4 w-4" /> : <X className="h-4 w-4" />}
                     <span>{extractResult.message}</span>
                 </div>
+            )}
+
+            {/* 自定义修改对话框 */}
+            <InputDialog
+                open={customDialogOpen}
+                onClose={() => setCustomDialogOpen(false)}
+                onConfirm={(instruction) => {
+                    if (customDialogText && instruction) {
+                        handleAIModify(`custom:${instruction}`, customDialogText);
+                    }
+                }}
+                title="自定义 AI 修改"
+                placeholder="例如：改成更诗意的表达 / 添加更多细节"
+                description="请输入你的修改指令，AI 将按照指令修改选中的文字"
+            />
+
+            {/* Alert 对话框 */}
+            {alertDialog && (
+                <AlertDialog
+                    open={alertDialog.open}
+                    onClose={() => setAlertDialog(null)}
+                    title={alertDialog.title}
+                    message={alertDialog.message}
+                    type={alertDialog.type}
+                />
             )}
         </div>
     );

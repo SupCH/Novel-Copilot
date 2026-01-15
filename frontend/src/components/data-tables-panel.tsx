@@ -440,9 +440,9 @@ export function DataTablesPanel() {
                                                                         style={{ width: `${width}px`, minWidth: '50px' }}
                                                                     >
                                                                         <span className="truncate block">{col}</span>
-                                                                        {/* 调整手柄 */}
+                                                                        {/* 调整手柄 - 加宽区域便于点击 */}
                                                                         <div
-                                                                            className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-primary/50 active:bg-primary"
+                                                                            className="absolute right-0 top-0 h-full w-2 cursor-col-resize bg-transparent hover:bg-primary/30 active:bg-primary/50"
                                                                             onMouseDown={(e) => handleResizeStart(e, table.table_type, i, width)}
                                                                             title="拖动调整列宽"
                                                                         />

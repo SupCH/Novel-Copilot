@@ -145,7 +145,8 @@ export function ContextMenu({ items, position, onClose }: ContextMenuProps) {
 // 预定义的 AI 修改菜单项
 export function getAIModifyMenuItems(
     selectedText: string,
-    onModify: (action: string, text: string) => void
+    onModify: (action: string, text: string) => void,
+    onShowCustomDialog?: () => void
 ): ContextMenuItem {
     return {
         label: "AI 修改",
@@ -186,12 +187,7 @@ export function getAIModifyMenuItems(
             {
                 label: "自定义修改...",
                 icon: <Edit className="w-4 h-4" />,
-                onClick: () => {
-                    const instruction = prompt("请输入修改指令：\n例如：改成更诗意的表达 / 添加更多细节 / 改成第一人称");
-                    if (instruction && instruction.trim()) {
-                        onModify(`custom:${instruction.trim()}`, selectedText);
-                    }
-                },
+                onClick: onShowCustomDialog || (() => { }),
             },
         ],
     };
@@ -205,7 +201,8 @@ export function getEditorContextMenuItems(
     onPaste: () => void,
     onAIModify: (action: string, text: string) => void,
     characterNames?: string[],
-    onViewCharacter?: (name: string) => void
+    onViewCharacter?: (name: string) => void,
+    onShowCustomDialog?: () => void
 ): ContextMenuItem[] {
     const hasSelection = selectedText.length > 0;
     const isCharacter = characterNames?.includes(selectedText.trim());
@@ -233,7 +230,7 @@ export function getEditorContextMenuItems(
         },
         { separator: true },
         {
-            ...getAIModifyMenuItems(selectedText, onAIModify),
+            ...getAIModifyMenuItems(selectedText, onAIModify, onShowCustomDialog),
             disabled: !hasSelection,
         },
     ];
