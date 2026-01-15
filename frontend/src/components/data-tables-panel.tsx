@@ -466,7 +466,8 @@ export function DataTablesPanel() {
                                                                             <textarea
                                                                                 value={row[colIndex] || ""}
                                                                                 onChange={(e) => updateCell(table.id, table.table_type, rowIndex, colIndex, e.target.value)}
-                                                                                className="w-full text-xs bg-transparent resize-y border-0 focus:ring-1 focus:ring-primary rounded p-1"
+                                                                                className="text-xs bg-transparent border-0 focus:ring-1 focus:ring-primary rounded p-1"
+                                                                                style={{ resize: 'both', minWidth: '80px', minHeight: '40px', width: '100%' }}
                                                                                 rows={2}
                                                                                 title={row[colIndex] || ""}
                                                                             />
