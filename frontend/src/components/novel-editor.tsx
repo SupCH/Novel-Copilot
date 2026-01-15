@@ -18,6 +18,7 @@ export function NovelEditor() {
         currentChapter,
         setCurrentChapter,
         updateChapter,
+        chapters,
         isGenerating,
         setIsGenerating,
         aiConfig,
@@ -65,10 +66,37 @@ export function NovelEditor() {
     // 章节切换时更新编辑器内容
     useEffect(() => {
         if (editor && currentChapter) {
-            editor.commands.setContent(currentChapter.content || "");
+            // 如果当前章节有内容，直接显示
+            if (currentChapter.content?.trim()) {
+                editor.commands.setContent(currentChapter.content);
+            } else {
+                // 空章节：自动填充前面章节的摘要作为写作上下文
+                const currentRank = currentChapter.rank || 0;
+                const previousChapters = chapters
+                    .filter(ch => (ch.rank || 0) < currentRank)
+                    .sort((a, b) => (b.rank || 0) - (a.rank || 0))
+                    .slice(0, 3)
+                    .reverse();
+
+                if (previousChapters.length > 0) {
+                    const summaries = previousChapters
+                        .filter(ch => ch.summary)
+                        .map(ch => `【${ch.title}】${ch.summary}`)
+                        .join('\n\n');
+
+                    if (summaries) {
+                        const placeholder = `<p><em style="color: #888;">【前情提要 - 可删除后开始写作】</em></p><p></p>${summaries.split('\n\n').map(s => `<p>${s}</p>`).join('')}<p></p><hr><p></p>`;
+                        editor.commands.setContent(placeholder);
+                    } else {
+                        editor.commands.setContent("");
+                    }
+                } else {
+                    editor.commands.setContent("");
+                }
+            }
             setPendingContent(null);
         }
-    }, [editor, currentChapter?.id]);
+    }, [editor, currentChapter?.id, chapters]);
 
     // 角色名列表更新时，更新全局变量并刷新视图
     useEffect(() => {
@@ -334,6 +362,18 @@ export function NovelEditor() {
                     <span className="text-xs text-muted-foreground">
                         {currentChapter.word_count} 字
                     </span>
+                    {currentChapter.summary ? (
+                        <span
+                            className="text-xs text-green-600 cursor-help"
+                            title={`摘要：${currentChapter.summary}`}
+                        >
+                            ✓ 已有摘要
+                        </span>
+                    ) : (
+                        <span className="text-xs text-orange-500">
+                            ⚠ 无摘要
+                        </span>
+                    )}
                 </div>
                 <div className="flex items-center gap-2">
                     <Button
