@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useAppStore } from "@/store/app-store";
 import { dataTablesApi, aiApi, DataTableResponse } from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -41,6 +41,10 @@ export function DataTablesPanel() {
     const [isOrganizing, setIsOrganizing] = useState(false);
     const [organizeResult, setOrganizeResult] = useState<{ success: boolean; message: string } | null>(null);
 
+    // 列宽状态 (按表格类型存储)
+    const [columnWidths, setColumnWidths] = useState<Record<number, Record<number, number>>>({});
+    const resizingRef = useRef<{ tableType: number; colIndex: number; startX: number; startWidth: number } | null>(null);
+
     // 加载数据表
     useEffect(() => {
         if (!currentProject) return;
@@ -63,6 +67,47 @@ export function DataTablesPanel() {
             return next;
         });
     };
+
+    // 列宽调整处理
+    const handleResizeStart = (e: React.MouseEvent, tableType: number, colIndex: number, currentWidth: number) => {
+        e.preventDefault();
+        resizingRef.current = {
+            tableType,
+            colIndex,
+            startX: e.clientX,
+            startWidth: currentWidth || 120,
+        };
+    };
+
+    useEffect(() => {
+        const handleMouseMove = (e: MouseEvent) => {
+            if (!resizingRef.current) return;
+
+            const { tableType, colIndex, startX, startWidth } = resizingRef.current;
+            const diff = e.clientX - startX;
+            const newWidth = Math.max(50, startWidth + diff);
+
+            setColumnWidths(prev => ({
+                ...prev,
+                [tableType]: {
+                    ...(prev[tableType] || {}),
+                    [colIndex]: newWidth,
+                },
+            }));
+        };
+
+        const handleMouseUp = () => {
+            resizingRef.current = null;
+        };
+
+        document.addEventListener("mousemove", handleMouseMove);
+        document.addEventListener("mouseup", handleMouseUp);
+
+        return () => {
+            document.removeEventListener("mousemove", handleMouseMove);
+            document.removeEventListener("mouseup", handleMouseUp);
+        };
+    }, []);
 
     // 更新单元格
     const updateCell = useCallback(async (
@@ -383,31 +428,51 @@ export function DataTablesPanel() {
                                             </div>
                                         ) : (
                                             <div className="overflow-x-auto">
-                                                <table className="w-full text-xs border-collapse border">
+                                                <table className="text-xs border-collapse border" style={{ tableLayout: 'fixed' }}>
                                                     <thead>
                                                         <tr className="border-b">
-                                                            {table.columns.map((col, i) => (
-                                                                <th key={i} className="px-2 py-1 text-left font-medium text-muted-foreground whitespace-nowrap border">
-                                                                    {col}
-                                                                </th>
-                                                            ))}
+                                                            {table.columns.map((col, i) => {
+                                                                const width = columnWidths[table.table_type]?.[i] || 120;
+                                                                return (
+                                                                    <th
+                                                                        key={i}
+                                                                        className="px-2 py-1 text-left font-medium text-muted-foreground border relative"
+                                                                        style={{ width: `${width}px`, minWidth: '50px' }}
+                                                                    >
+                                                                        <span className="truncate block">{col}</span>
+                                                                        {/* 调整手柄 */}
+                                                                        <div
+                                                                            className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-primary/50 active:bg-primary"
+                                                                            onMouseDown={(e) => handleResizeStart(e, table.table_type, i, width)}
+                                                                            title="拖动调整列宽"
+                                                                        />
+                                                                    </th>
+                                                                );
+                                                            })}
                                                             <th className="w-8 border"></th>
                                                         </tr>
                                                     </thead>
                                                     <tbody>
                                                         {table.rows.map((row, rowIndex) => (
                                                             <tr key={rowIndex} className="border-b last:border-b-0 group">
-                                                                {table.columns.map((_, colIndex) => (
-                                                                    <td key={colIndex} className="px-1 py-1 min-w-[100px] align-top border">
-                                                                        <textarea
-                                                                            value={row[colIndex] || ""}
-                                                                            onChange={(e) => updateCell(table.id, table.table_type, rowIndex, colIndex, e.target.value)}
-                                                                            className="w-full text-xs bg-transparent resize-none border-0 focus:ring-1 focus:ring-primary rounded p-1"
-                                                                            rows={2}
-                                                                            title={row[colIndex] || ""}
-                                                                        />
-                                                                    </td>
-                                                                ))}
+                                                                {table.columns.map((_, colIndex) => {
+                                                                    const width = columnWidths[table.table_type]?.[colIndex] || 120;
+                                                                    return (
+                                                                        <td
+                                                                            key={colIndex}
+                                                                            className="px-1 py-1 align-top border"
+                                                                            style={{ width: `${width}px` }}
+                                                                        >
+                                                                            <textarea
+                                                                                value={row[colIndex] || ""}
+                                                                                onChange={(e) => updateCell(table.id, table.table_type, rowIndex, colIndex, e.target.value)}
+                                                                                className="w-full text-xs bg-transparent resize-y border-0 focus:ring-1 focus:ring-primary rounded p-1"
+                                                                                rows={2}
+                                                                                title={row[colIndex] || ""}
+                                                                            />
+                                                                        </td>
+                                                                    );
+                                                                })}
                                                                 <td className="px-1 border">
                                                                     <Button
                                                                         variant="ghost"
