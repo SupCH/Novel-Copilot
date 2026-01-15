@@ -207,10 +207,7 @@ export function NovelEditor() {
         if (!currentProject || !editor || isGenerating) return;
 
         const context = editor.getText();
-        if (!context.trim()) {
-            alert("请先输入一些内容");
-            return;
-        }
+        // 允许空内容 - 后端会自动获取前章摘要作为上下文
 
         setIsGenerating(true);
         setPendingContent("");
