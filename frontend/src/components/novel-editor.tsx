@@ -7,7 +7,7 @@ import Placeholder from "@tiptap/extension-placeholder";
 import { useAppStore } from "@/store/app-store";
 import { chaptersApi, aiApi, dataTablesApi } from "@/lib/api";
 import { Button } from "@/components/ui/button";
-import { Sparkles, Save, Check, RefreshCw, X } from "lucide-react";
+import { Sparkles, Save, Check, RefreshCw, X, FileText } from "lucide-react";
 import { ContextMenu, getEditorContextMenuItems } from "@/components/context-menu";
 import { CharacterHoverCard, CharacterData } from "@/components/character-hover-card";
 import { CharacterHighlight, updateCharacterNames } from "@/lib/character-highlight";
@@ -38,6 +38,8 @@ export function NovelEditor() {
     const [hoverCard, setHoverCard] = useState<{ name: string; x: number; y: number } | null>(null);
     const [characterData, setCharacterData] = useState<CharacterData | null>(null);
     const [characterNames, setCharacterNames] = useState<string[]>([]);
+    // 生成摘要状态
+    const [isSummarizing, setIsSummarizing] = useState(false);
 
     // 编辑器扩展配置
     const editorExtensions = useMemo(() => [
@@ -154,6 +156,33 @@ export function NovelEditor() {
         setShowSaveToast(true);
         setTimeout(() => setShowSaveToast(false), 2000);
     }, [currentChapter, editor, updateChapter, setCurrentChapter]);
+
+    // 生成摘要
+    const handleSummarize = useCallback(async () => {
+        if (!currentChapter || isSummarizing) return;
+
+        setIsSummarizing(true);
+        try {
+            const result = await aiApi.summarize({
+                chapter_id: currentChapter.id,
+                config: aiConfig,
+            });
+
+            // 更新章节摘要
+            const updated = await chaptersApi.update(currentChapter.id, {
+                summary: result.summary
+            });
+            updateChapter(currentChapter.id, updated);
+            setCurrentChapter(updated);
+
+            alert(`摘要已生成：\n\n${result.summary}`);
+        } catch (error) {
+            console.error("Generate summary error:", error);
+            alert("生成摘要失败，请检查 AI 配置");
+        } finally {
+            setIsSummarizing(false);
+        }
+    }, [currentChapter, isSummarizing, aiConfig, updateChapter, setCurrentChapter]);
 
     // 自动保存 (debounced)
     useEffect(() => {
@@ -307,6 +336,17 @@ export function NovelEditor() {
                     >
                         <Save className="h-4 w-4" />
                         保存
+                    </Button>
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleSummarize}
+                        disabled={isSummarizing || isGenerating}
+                        className="gap-1"
+                        title="生成章节摘要，用于 AI 续写时的上下文"
+                    >
+                        <FileText className="h-4 w-4" />
+                        {isSummarizing ? "生成中..." : "生成摘要"}
                     </Button>
                     <Button
                         size="sm"
