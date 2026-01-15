@@ -32,6 +32,7 @@ async def generate_continuation(
     world_view: str = "",
     style: str = "",
     relationships: list[dict] = None,
+    previous_summaries: str = "",
     model: str = "gpt-4o-mini",
     temperature: float = 0.7,
     max_tokens: int = 1000,
@@ -57,6 +58,10 @@ async def generate_continuation(
         "4. 保持与原文一致的叙事视角和语气",
         "5. 情节连贯，人物性格一致",
     ]
+    
+    # 添加前面章节摘要（用于上下文连贯性）
+    if previous_summaries:
+        system_parts.append(f"\n\n【前情提要】\n{previous_summaries}")
     
     if world_view:
         system_parts.append(f"\n\n【世界观设定】\n{world_view}")

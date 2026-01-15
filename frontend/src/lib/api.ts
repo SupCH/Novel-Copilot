@@ -166,6 +166,7 @@ export const aiApi = {
     // SSE 续写
     continueStream: async function* (data: {
         project_id: number;
+        chapter_id?: number;
         context: string;
         config?: { baseUrl?: string; apiKey?: string; model?: string; maxTokens?: number };
     }) {
@@ -177,6 +178,7 @@ export const aiApi = {
             credentials: "omit",
             body: JSON.stringify({
                 project_id: data.project_id,
+                chapter_id: data.chapter_id,
                 context: data.context,
                 model: data.config?.model || "gpt-4o-mini",
                 max_tokens: data.config?.maxTokens || 500,

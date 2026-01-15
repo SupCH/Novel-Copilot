@@ -20,6 +20,7 @@ router = APIRouter(prefix="/api/ai", tags=["AI"])
 class ContinueRequest(BaseModel):
     """AI 续写请求"""
     project_id: int
+    chapter_id: Optional[int] = None  # 当前章节 ID，用于获取前文
     context: str  # 前文内容
     model: str = "gpt-4o-mini"
     temperature: float = 0.7
@@ -69,6 +70,36 @@ async def ai_continue(data: ContinueRequest, db: AsyncSession = Depends(get_db))
                 "description": rel.description,
             })
     
+    # 获取前面章节的摘要（用于上下文连贯性）
+    previous_summaries = ""
+    if data.chapter_id:
+        # 获取当前章节信息
+        current_chapter_result = await db.execute(
+            select(Chapter).where(Chapter.id == data.chapter_id)
+        )
+        current_chapter = current_chapter_result.scalar_one_or_none()
+        
+        if current_chapter:
+            # 获取排序在当前章节之前的章节（最多 3 章）
+            prev_chapters_result = await db.execute(
+                select(Chapter)
+                .where(Chapter.project_id == data.project_id)
+                .where(Chapter.rank < current_chapter.rank)
+                .order_by(Chapter.rank.desc())
+                .limit(3)
+            )
+            prev_chapters = prev_chapters_result.scalars().all()
+            
+            # 按顺序排列并提取摘要
+            prev_chapters = list(reversed(prev_chapters))
+            summaries = []
+            for ch in prev_chapters:
+                if ch.summary:
+                    summaries.append(f"【{ch.title}】{ch.summary}")
+            
+            if summaries:
+                previous_summaries = "\\n\\n".join(summaries)
+    
     async def event_stream():
         """SSE 事件流生成器"""
         async for chunk in generate_continuation(
@@ -76,6 +107,7 @@ async def ai_continue(data: ContinueRequest, db: AsyncSession = Depends(get_db))
             world_view=project.world_view or "",
             style=project.style or "",
             relationships=relationships,
+            previous_summaries=previous_summaries,
             model=data.model,
             temperature=data.temperature,
             max_tokens=data.max_tokens,

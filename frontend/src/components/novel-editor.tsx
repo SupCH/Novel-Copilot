@@ -190,6 +190,7 @@ export function NovelEditor() {
             let generated = "";
             for await (const chunk of aiApi.continueStream({
                 project_id: currentProject.id,
+                chapter_id: currentChapter?.id,
                 context,
                 config: aiConfig,
             })) {
