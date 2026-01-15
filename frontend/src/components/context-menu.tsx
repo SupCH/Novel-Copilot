@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback, ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { Copy, Clipboard, Scissors, Wand2, ChevronRight, RefreshCw, Minimize2, Maximize2, MessageSquare, User } from "lucide-react";
+import { Copy, Clipboard, Scissors, Wand2, ChevronRight, RefreshCw, Minimize2, Maximize2, MessageSquare, User, Edit } from "lucide-react";
 
 export interface ContextMenuItem {
     label?: string;  // Optional for separators
@@ -181,6 +181,17 @@ export function getAIModifyMenuItems(
                 label: "改为严肃语气",
                 icon: <MessageSquare className="w-4 h-4" />,
                 onClick: () => onModify("serious", selectedText),
+            },
+            { separator: true },
+            {
+                label: "自定义修改...",
+                icon: <Edit className="w-4 h-4" />,
+                onClick: () => {
+                    const instruction = prompt("请输入修改指令：\n例如：改成更诗意的表达 / 添加更多细节 / 改成第一人称");
+                    if (instruction && instruction.trim()) {
+                        onModify(`custom:${instruction.trim()}`, selectedText);
+                    }
+                },
             },
         ],
     };

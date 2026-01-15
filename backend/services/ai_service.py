@@ -148,7 +148,8 @@ async def modify_text(
     """
     AI 修改文字
     action: rewrite(重写), shorten(精简), expand(扩写), 
-            formal(正式), casual(轻松), serious(严肃)
+            formal(正式), casual(轻松), serious(严肃),
+            custom:xxx(自定义指令)
     """
     client = get_client(api_base, api_key)
     
@@ -161,7 +162,12 @@ async def modify_text(
         "serious": "请将以下文字改写为严肃、庄重的语气：",
     }
     
-    prompt = action_prompts.get(action, action_prompts["rewrite"])
+    # 处理自定义指令
+    if action.startswith("custom:"):
+        custom_instruction = action[7:]  # 去掉 "custom:" 前缀
+        prompt = f"请按照以下要求修改文字：{custom_instruction}"
+    else:
+        prompt = action_prompts.get(action, action_prompts["rewrite"])
     
     try:
         response = await client.chat.completions.create(
