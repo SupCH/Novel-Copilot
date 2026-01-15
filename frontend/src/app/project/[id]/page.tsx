@@ -1,5 +1,8 @@
 "use client";
 
+// Cloudflare Pages Edge Runtime
+export const runtime = 'edge';
+
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
