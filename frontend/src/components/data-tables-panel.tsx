@@ -428,7 +428,7 @@ export function DataTablesPanel() {
                                             </div>
                                         ) : (
                                             <div className="overflow-x-auto">
-                                                <table className="text-xs border-collapse border" style={{ tableLayout: 'fixed' }}>
+                                                <table className="text-xs border-collapse border" style={{ width: 'max-content', minWidth: '100%' }}>
                                                     <thead>
                                                         <tr className="border-b">
                                                             {table.columns.map((col, i) => {
