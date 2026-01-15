@@ -91,6 +91,25 @@ export default function ProjectPage() {
         router.push("/");
     };
 
+    // 键盘快捷键：Ctrl+D 打开数据面板新窗口
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if ((e.ctrlKey || e.metaKey) && e.key === "d") {
+                e.preventDefault();
+                if (currentProject) {
+                    window.open(
+                        `/project/${currentProject.id}/data`,
+                        'data-panel',
+                        'width=1200,height=800,menubar=no,toolbar=no,location=no,status=no'
+                    );
+                }
+            }
+        };
+
+        document.addEventListener("keydown", handleKeyDown);
+        return () => document.removeEventListener("keydown", handleKeyDown);
+    }, [currentProject]);
+
     if (loading) {
         return (
             <main className="min-h-screen bg-background flex items-center justify-center">

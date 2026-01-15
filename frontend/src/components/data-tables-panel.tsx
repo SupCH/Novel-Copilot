@@ -13,7 +13,7 @@ import {
     DialogDescription,
     DialogFooter,
 } from "@/components/ui/dialog";
-import { ChevronDown, ChevronRight, Plus, Trash2, RefreshCw, Check, X, Network, Sparkles } from "lucide-react";
+import { ChevronDown, ChevronRight, Plus, Trash2, RefreshCw, Check, X, Network, Sparkles, ExternalLink } from "lucide-react";
 import { CharacterGraph } from "@/components/character-graph";
 
 export function DataTablesPanel() {
@@ -220,6 +220,23 @@ export function DataTablesPanel() {
             <div className="p-3 pb-0 flex items-center justify-between">
                 <span className="text-sm font-medium">数据表</span>
                 <div className="flex gap-1">
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 w-7 p-0"
+                        onClick={() => {
+                            if (currentProject) {
+                                window.open(
+                                    `/project/${currentProject.id}/data`,
+                                    'data-panel',
+                                    'width=1200,height=800,menubar=no,toolbar=no,location=no,status=no'
+                                );
+                            }
+                        }}
+                        title="在新窗口打开数据面板 (Ctrl+D)"
+                    >
+                        <ExternalLink className="h-3.5 w-3.5" />
+                    </Button>
                     <Button
                         variant="outline"
                         size="sm"
