@@ -7,7 +7,7 @@ import Placeholder from "@tiptap/extension-placeholder";
 import { useAppStore } from "@/store/app-store";
 import { chaptersApi, aiApi, dataTablesApi } from "@/lib/api";
 import { Button } from "@/components/ui/button";
-import { Sparkles, Save, Check, RefreshCw, X, FileText } from "lucide-react";
+import { Sparkles, Save, Check, RefreshCw, X, FileText, Undo2 } from "lucide-react";
 import { ContextMenu, getEditorContextMenuItems } from "@/components/context-menu";
 import { CharacterHoverCard, CharacterData } from "@/components/character-hover-card";
 import { CharacterHighlight, updateCharacterNames } from "@/lib/character-highlight";
@@ -467,6 +467,16 @@ export function NovelEditor() {
                     )}
                 </div>
                 <div className="flex items-center gap-2">
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => editor?.commands.undo()}
+                        disabled={!editor?.can().undo()}
+                        className="h-8 w-8 p-0"
+                        title="撤销 (Ctrl+Z)"
+                    >
+                        <Undo2 className="h-4 w-4" />
+                    </Button>
                     <Button
                         variant="outline"
                         size="sm"
