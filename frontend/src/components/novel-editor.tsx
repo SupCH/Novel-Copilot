@@ -12,6 +12,7 @@ import { ContextMenu, getEditorContextMenuItems } from "@/components/context-men
 import { CharacterHoverCard, CharacterData } from "@/components/character-hover-card";
 import { CharacterHighlight, updateCharacterNames } from "@/lib/character-highlight";
 import { AlertDialog, InputDialog } from "@/components/ui/custom-dialog";
+import { ChapterSelectDialog } from "@/components/chapter-select-dialog";
 
 export function NovelEditor() {
     const {
@@ -47,6 +48,8 @@ export function NovelEditor() {
     const [customDialogText, setCustomDialogText] = useState("");
     // Alert 对话框状态
     const [alertDialog, setAlertDialog] = useState<{ open: boolean; title: string; message: string; type: "success" | "error" | "info" } | null>(null);
+    // 章节选择弹窗状态
+    const [summarySelectOpen, setSummarySelectOpen] = useState(false);
 
     // 编辑器扩展配置
     const editorExtensions = useMemo(() => [
@@ -424,8 +427,8 @@ export function NovelEditor() {
                     <Button
                         variant="outline"
                         size="sm"
-                        onClick={handleSummarize}
-                        disabled={isSummarizing || isGenerating}
+                        onClick={() => setSummarySelectOpen(true)}
+                        disabled={isSummarizing || isGenerating || chapters.length === 0}
                         className="gap-1"
                         title="生成章节摘要，用于 AI 续写时的上下文"
                     >
@@ -597,6 +600,50 @@ export function NovelEditor() {
                     type={alertDialog.type}
                 />
             )}
+
+            {/* 章节选择弹窗 - 生成摘要 */}
+            <ChapterSelectDialog
+                open={summarySelectOpen}
+                onOpenChange={setSummarySelectOpen}
+                chapters={chapters}
+                title="选择要生成摘要的章节"
+                onConfirm={async (selectedChapterIds) => {
+                    if (selectedChapterIds.length === 0) return;
+
+                    setIsSummarizing(true);
+                    let successCount = 0;
+                    let failCount = 0;
+
+                    for (const chapterId of selectedChapterIds) {
+                        try {
+                            const result = await aiApi.summarize({
+                                chapter_id: chapterId,
+                                config: aiConfig,
+                            });
+                            // 更新章节摘要
+                            const updated = await chaptersApi.update(chapterId, {
+                                summary: result.summary
+                            });
+                            updateChapter(chapterId, updated);
+                            if (chapterId === currentChapter?.id) {
+                                setCurrentChapter(updated);
+                            }
+                            successCount++;
+                        } catch (error) {
+                            console.error(`Summarize chapter ${chapterId} error:`, error);
+                            failCount++;
+                        }
+                    }
+
+                    setIsSummarizing(false);
+                    setAlertDialog({
+                        open: true,
+                        title: failCount === 0 ? "摘要生成完成" : "摘要生成部分完成",
+                        message: `成功: ${successCount} 章${failCount > 0 ? `，失败: ${failCount} 章` : ""}`,
+                        type: failCount === 0 ? "success" : "info"
+                    });
+                }}
+            />
         </div>
     );
 }
