@@ -16,9 +16,10 @@ import {
 import { CharacterGraph } from "@/components/character-graph";
 import { DataTablesPanel } from "@/components/data-tables-panel";
 import { RelationshipsTable } from "@/components/relationships-table";
+import { OutlinePanel } from "@/components/outline-panel";
 import { useAppStore } from "@/store/app-store";
 import { charactersApi, relationshipsApi, projectsApi } from "@/lib/api";
-import { Settings, Network, Plus, User, Pencil, Table2 } from "lucide-react";
+import { Settings, Network, Plus, User, Pencil, Table2, BookOpen } from "lucide-react";
 import type { Character } from "@/lib/api";
 
 export function RightPanel() {
@@ -41,6 +42,7 @@ export function RightPanel() {
     const [settingsDialogOpen, setSettingsDialogOpen] = useState(false);
     const [editStyle, setEditStyle] = useState("");
     const [editWorldView, setEditWorldView] = useState("");
+    const [editPerspective, setEditPerspective] = useState("third");
 
     // 加载角色和关系
     useEffect(() => {
@@ -78,6 +80,7 @@ export function RightPanel() {
         if (currentProject) {
             setEditStyle(currentProject.style || "");
             setEditWorldView(currentProject.world_view || "");
+            setEditPerspective(currentProject.perspective || "third");
             setSettingsDialogOpen(true);
         }
     };
@@ -89,7 +92,8 @@ export function RightPanel() {
         // 检查是否有变化
         const hasChanges =
             editStyle !== (currentProject.style || "") ||
-            editWorldView !== (currentProject.world_view || "");
+            editWorldView !== (currentProject.world_view || "") ||
+            editPerspective !== (currentProject.perspective || "third");
 
         if (!hasChanges) return;
 
@@ -98,6 +102,7 @@ export function RightPanel() {
                 const updated = await projectsApi.update(currentProject.id, {
                     style: editStyle || null,
                     world_view: editWorldView || null,
+                    perspective: editPerspective,
                 });
                 setCurrentProject(updated);
             } catch (error) {
@@ -106,7 +111,7 @@ export function RightPanel() {
         }, 500);
 
         return () => clearTimeout(timer);
-    }, [editStyle, editWorldView, settingsDialogOpen, currentProject, setCurrentProject]);
+    }, [editStyle, editWorldView, editPerspective, settingsDialogOpen, currentProject, setCurrentProject]);
 
     return (
         <div className="h-full flex flex-col border-l">
@@ -139,6 +144,15 @@ export function RightPanel() {
                     <Table2 className="h-4 w-4" />
                     数据
                 </Button>
+                <Button
+                    variant={rightPanelTab === "outline" ? "secondary" : "ghost"}
+                    size="sm"
+                    onClick={() => setRightPanelTab("outline")}
+                    className="flex-1 gap-1"
+                >
+                    <BookOpen className="h-4 w-4" />
+                    大纲
+                </Button>
             </div>
 
             {/* 内容区 */}
@@ -162,6 +176,14 @@ export function RightPanel() {
                                     </div>
                                     <div className="space-y-3 text-sm">
                                         <div>
+                                            <label className="text-muted-foreground">人称视角</label>
+                                            <p>{
+                                                currentProject.perspective === "first" ? "第一人称" :
+                                                    currentProject.perspective === "omniscient" ? "上帝视角" :
+                                                        "第三人称"
+                                            }</p>
+                                        </div>
+                                        <div>
                                             <label className="text-muted-foreground">写作风格</label>
                                             <p>{currentProject.style || "未设置"}</p>
                                         </div>
@@ -180,6 +202,35 @@ export function RightPanel() {
                                                 <DialogTitle>编辑项目设置</DialogTitle>
                                             </DialogHeader>
                                             <div className="space-y-4 pt-4">
+                                                <div>
+                                                    <label className="text-sm font-medium mb-2 block">人称视角</label>
+                                                    <div className="flex gap-2">
+                                                        <Button
+                                                            type="button"
+                                                            size="sm"
+                                                            variant={editPerspective === "first" ? "default" : "outline"}
+                                                            onClick={() => setEditPerspective("first")}
+                                                        >
+                                                            第一人称
+                                                        </Button>
+                                                        <Button
+                                                            type="button"
+                                                            size="sm"
+                                                            variant={editPerspective === "third" ? "default" : "outline"}
+                                                            onClick={() => setEditPerspective("third")}
+                                                        >
+                                                            第三人称
+                                                        </Button>
+                                                        <Button
+                                                            type="button"
+                                                            size="sm"
+                                                            variant={editPerspective === "omniscient" ? "default" : "outline"}
+                                                            onClick={() => setEditPerspective("omniscient")}
+                                                        >
+                                                            上帝视角
+                                                        </Button>
+                                                    </div>
+                                                </div>
                                                 <div>
                                                     <label className="text-sm font-medium mb-2 block">写作风格</label>
                                                     <Input
@@ -211,6 +262,8 @@ export function RightPanel() {
                     </ScrollArea>
                 ) : rightPanelTab === "graph" ? (
                     <RelationshipsTable />
+                ) : rightPanelTab === "outline" ? (
+                    <OutlinePanel />
                 ) : (
                     <DataTablesPanel />
                 )}

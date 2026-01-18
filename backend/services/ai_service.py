@@ -33,6 +33,9 @@ async def generate_continuation(
     style: str = "",
     relationships: list[dict] = None,
     previous_summaries: str = "",
+    outline: str = "",
+    chapter_outline: str = "",
+    perspective: str = "third",
     model: str = "gpt-4o-mini",
     temperature: float = 0.7,
     max_tokens: int = 1000,
@@ -46,6 +49,14 @@ async def generate_continuation(
     print(f"[AI_CONTINUE] model={model}, api_base={api_base}")
     client = get_client(api_base, api_key)
 
+    # 人称视角说明
+    perspective_desc = {
+        "first": "第一人称视角（使用「我」来叙述）",
+        "third": "第三人称视角（使用角色名字来叙述）",
+        "omniscient": "上帝视角（全知全能的叙述者，可以描写任何角色的内心想法）",
+    }
+    perspective_text = perspective_desc.get(perspective, perspective_desc["third"])
+
     # 构建系统提示 - 只要求生成纯正文，不要任何代码或标签
     print(f"[DEBUG] generate_continuation called with model: '{model}', api_base: '{api_base}'")
     system_parts = [
@@ -55,9 +66,17 @@ async def generate_continuation(
         "1. 只输出小说正文，不要添加任何代码、标签、函数调用或技术语法",
         "2. 不要写任何类似 insertRow、updateRow、tableEdit 等内容",
         "3. 不要添加评论、解释或元叙述",
-        "4. 保持与原文一致的叙事视角和语气",
+        f"4. 使用{perspective_text}进行叙述",
         "5. 情节连贯，人物性格一致",
     ]
+    
+    # 添加剧情大纲
+    if outline:
+        system_parts.append(f"\n\n【剧情大纲】\n{outline}")
+    
+    # 添加章节大纲
+    if chapter_outline:
+        system_parts.append(f"\n\n【本章大纲】\n{chapter_outline}")
     
     # 添加前面章节摘要（用于上下文连贯性）
     if previous_summaries:

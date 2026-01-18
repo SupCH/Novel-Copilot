@@ -100,6 +100,14 @@ async def ai_continue(data: ContinueRequest, db: AsyncSession = Depends(get_db))
             if summaries:
                 previous_summaries = "\\n\\n".join(summaries)
     
+    # 获取当前章节大纲
+    chapter_outline = ""
+    if data.chapter_id:
+        ch_result = await db.execute(select(Chapter).where(Chapter.id == data.chapter_id))
+        ch = ch_result.scalar_one_or_none()
+        if ch and ch.chapter_outline:
+            chapter_outline = ch.chapter_outline
+    
     async def event_stream():
         """SSE 事件流生成器"""
         async for chunk in generate_continuation(
@@ -108,6 +116,9 @@ async def ai_continue(data: ContinueRequest, db: AsyncSession = Depends(get_db))
             style=project.style or "",
             relationships=relationships,
             previous_summaries=previous_summaries,
+            outline=project.outline or "",
+            chapter_outline=chapter_outline,
+            perspective=project.perspective or "third",
             model=data.model,
             temperature=data.temperature,
             max_tokens=data.max_tokens,

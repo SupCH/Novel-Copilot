@@ -36,8 +36,8 @@ interface AppState {
     setSidebarOpen: (open: boolean) => void;
     rightPanelOpen: boolean;
     setRightPanelOpen: (open: boolean) => void;
-    rightPanelTab: "settings" | "graph" | "tables";
-    setRightPanelTab: (tab: "settings" | "graph" | "tables") => void;
+    rightPanelTab: "settings" | "graph" | "tables" | "outline";
+    setRightPanelTab: (tab: "settings" | "graph" | "tables" | "outline") => void;
 
     // AI 状态
     isGenerating: boolean;

@@ -41,6 +41,8 @@ export interface Project {
     description: string | null;
     world_view: string | null;
     style: string | null;
+    outline: string | null;
+    perspective: string | null;
     created_at: string;
     updated_at: string;
 }
@@ -76,6 +78,7 @@ export interface Chapter {
     rank: number;
     word_count: number;
     summary: string | null;
+    chapter_outline: string | null;
     characters_mentioned: number[] | null;
     created_at: string;
     updated_at: string;

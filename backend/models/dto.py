@@ -15,6 +15,8 @@ class ProjectCreate(BaseModel):
     description: Optional[str] = None
     world_view: Optional[str] = None
     style: Optional[str] = None
+    outline: Optional[str] = None
+    perspective: Optional[str] = "third"  # first/third/omniscient
 
 
 class ProjectUpdate(BaseModel):
@@ -22,6 +24,8 @@ class ProjectUpdate(BaseModel):
     description: Optional[str] = None
     world_view: Optional[str] = None
     style: Optional[str] = None
+    outline: Optional[str] = None
+    perspective: Optional[str] = None
 
 
 class ProjectResponse(BaseModel):
@@ -30,6 +34,8 @@ class ProjectResponse(BaseModel):
     description: Optional[str]
     world_view: Optional[str]
     style: Optional[str]
+    outline: Optional[str]
+    perspective: Optional[str]
     created_at: datetime
     updated_at: datetime
 
@@ -112,6 +118,7 @@ class ChapterUpdate(BaseModel):
     content: Optional[str] = None
     rank: Optional[int] = None
     summary: Optional[str] = None
+    chapter_outline: Optional[str] = None
     characters_mentioned: Optional[list] = None
 
 
@@ -123,6 +130,7 @@ class ChapterResponse(BaseModel):
     rank: int
     word_count: int
     summary: Optional[str]
+    chapter_outline: Optional[str]
     characters_mentioned: Optional[list]
     created_at: datetime
     updated_at: datetime

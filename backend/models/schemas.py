@@ -20,6 +20,10 @@ class Project(Base):
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     world_view: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     style: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    # 剧情大纲
+    outline: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    # 人称视角: first(第一人称), third(第三人称), omniscient(上帝视角)
+    perspective: Mapped[Optional[str]] = mapped_column(String(20), nullable=True, default="third")
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
 
@@ -77,6 +81,8 @@ class Chapter(Base):
     rank: Mapped[int] = mapped_column(Integer, default=0)
     word_count: Mapped[int] = mapped_column(Integer, default=0)
     summary: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    # 章节大纲
+    chapter_outline: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     characters_mentioned: Mapped[Optional[list]] = mapped_column(JSON, nullable=True, default=list)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
