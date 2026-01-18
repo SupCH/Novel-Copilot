@@ -495,7 +495,26 @@ async def organize_characters(data: OrganizeCharactersRequest, db: AsyncSession 
         
         result_text = response.choices[0].message.content
         import json
-        result_data = json.loads(result_text)
+        import re
+        
+        # 尝试解析 JSON，如果失败则尝试提取 JSON 部分
+        try:
+            result_data = json.loads(result_text)
+        except json.JSONDecodeError as e:
+            print(f"[WARN] organize_characters: Initial JSON parse failed: {e}")
+            # 尝试提取 JSON 对象
+            json_match = re.search(r'\{[\s\S]*\}', result_text)
+            if json_match:
+                try:
+                    result_data = json.loads(json_match.group())
+                except json.JSONDecodeError as e2:
+                    print(f"[ERROR] organize_characters: JSON extraction also failed: {e2}")
+                    print(f"[ERROR] Raw response: {result_text[:500]}...")
+                    raise HTTPException(status_code=500, detail=f"AI 返回的格式无法解析: {str(e2)}")
+            else:
+                print(f"[ERROR] organize_characters: No JSON found in response")
+                print(f"[ERROR] Raw response: {result_text[:500]}...")
+                raise HTTPException(status_code=500, detail="AI 返回的内容不包含有效 JSON")
         
         # 更新人物表
         characters = result_data.get("characters", [])
