@@ -14,6 +14,7 @@ import {
     DialogFooter,
 } from "@/components/ui/dialog";
 import { Plus, Trash2 } from "lucide-react";
+import { CharacterGraph } from "@/components/character-graph";
 
 export function RelationshipsTable() {
     const { currentProject, dataTablesRefreshKey } = useAppStore();
@@ -223,6 +224,18 @@ export function RelationshipsTable() {
                             </div>
                         </div>
                     ))}
+                </div>
+            )}
+
+            {/* 关系图 */}
+            {table.rows.length > 0 && (
+                <div className="mt-4 border rounded-lg overflow-hidden">
+                    <div className="p-2 bg-muted/50 text-sm font-medium">
+                        关系图
+                    </div>
+                    <div className="h-[300px]">
+                        <CharacterGraph embedded />
+                    </div>
                 </div>
             )}
         </div>

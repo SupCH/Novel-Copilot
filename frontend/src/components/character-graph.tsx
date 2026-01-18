@@ -22,8 +22,9 @@ import { createPortal } from "react-dom";
 import { dataTablesApi } from "@/lib/api";
 
 interface CharacterGraphProps {
-    isOpen: boolean;
-    onClose: () => void;
+    isOpen?: boolean;
+    onClose?: () => void;
+    embedded?: boolean;
 }
 
 // 自动布局算法 - 圆形布局
@@ -68,7 +69,7 @@ function getEdgeColor(relation: string): string {
     return "#6b7280"; // 默认灰色
 }
 
-export function CharacterGraph({ isOpen, onClose }: CharacterGraphProps) {
+export function CharacterGraph({ isOpen = true, onClose, embedded = false }: CharacterGraphProps) {
     const { currentProject } = useAppStore();
     const [characters, setCharacters] = useState<Array<Record<number, string>>>([]);
     const [relationships, setRelationships] = useState<Array<Record<number, string>>>([]);
@@ -138,36 +139,58 @@ export function CharacterGraph({ isOpen, onClose }: CharacterGraphProps) {
         [characters, positions, getNodeStyle]
     );
 
-    // 将关系转换为边
+    // 将关系转换为边 - 同时去重双向关系
     const initialEdges: Edge[] = useMemo(
-        () =>
-            relationships.map((rel, index) => {
+        () => {
+            const edgeMap = new Map<string, Edge>();
+
+            relationships.forEach((rel, index) => {
+                const source = rel[0] || "";
+                const target = rel[1] || "";
                 const relation = rel[2] || "";
                 const color = getEdgeColor(relation);
-                return {
-                    id: `edge-${index}`,
-                    source: rel[0] || "",
-                    target: rel[1] || "",
-                    label: relation,
-                    animated: relation.includes("敌") || relation.includes("仇"),
-                    style: {
-                        stroke: color,
-                        strokeWidth: 2,
-                    },
-                    labelStyle: {
-                        fontSize: 11,
-                        fill: "#374151",
-                        fontWeight: 500,
-                    },
-                    labelBgStyle: {
-                        fill: "#ffffff",
-                        fillOpacity: 0.95,
-                        rx: 4,
-                        ry: 4,
-                    },
-                    labelBgPadding: [6, 4] as [number, number],
-                };
-            }),
+
+                // 生成规范化的 key（较小的在前）
+                const sortedKey = [source, target].sort().join("<->");
+
+                // 检查是否已存在双向边
+                if (edgeMap.has(sortedKey)) {
+                    // 如果已存在，合并标签
+                    const existing = edgeMap.get(sortedKey)!;
+                    const existingLabel = existing.label as string;
+                    if (!existingLabel.includes(relation)) {
+                        existing.label = `${existingLabel} / ${relation}`;
+                    }
+                } else {
+                    // 创建新边
+                    edgeMap.set(sortedKey, {
+                        id: `edge-${index}`,
+                        source,
+                        target,
+                        label: relation,
+                        animated: relation.includes("敌") || relation.includes("仇"),
+                        style: {
+                            stroke: color,
+                            strokeWidth: 2,
+                        },
+                        labelStyle: {
+                            fontSize: 11,
+                            fill: "#374151",
+                            fontWeight: 500,
+                        },
+                        labelBgStyle: {
+                            fill: "#ffffff",
+                            fillOpacity: 0.95,
+                            rx: 4,
+                            ry: 4,
+                        },
+                        labelBgPadding: [6, 4] as [number, number],
+                    });
+                }
+            });
+
+            return Array.from(edgeMap.values());
+        },
         [relationships]
     );
 
@@ -211,6 +234,31 @@ export function CharacterGraph({ isOpen, onClose }: CharacterGraphProps) {
     }, [selectedNode, relationships]);
 
     if (!isOpen || !mounted) return null;
+
+    // 嵌入式模式 - 简化的 ReactFlow
+    if (embedded) {
+        if (characters.length === 0) {
+            return (
+                <div className="h-full flex items-center justify-center text-muted-foreground text-sm">
+                    暂无数据
+                </div>
+            );
+        }
+        return (
+            <ReactFlow
+                nodes={nodes}
+                edges={edges}
+                onNodesChange={onNodesChange}
+                onEdgesChange={onEdgesChange}
+                onConnect={onConnect}
+                fitView
+                className="bg-background"
+            >
+                <Background />
+                <Controls showMinimap={false} />
+            </ReactFlow>
+        );
+    }
 
     const content = (
         <div className="fixed inset-0 z-[99999] bg-background/95 backdrop-blur-sm">

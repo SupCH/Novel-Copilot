@@ -157,6 +157,21 @@ export function OutlinePanel() {
                     </div>
                 )}
             </div>
+
+            {/* 章节摘要（只读显示） */}
+            {currentChapter && currentChapter.summary && (
+                <>
+                    <div className="border-t my-2" />
+                    <div className="flex flex-col gap-2">
+                        <div className="flex items-center gap-2 font-medium text-muted-foreground">
+                            <span>📝 章节摘要</span>
+                        </div>
+                        <div className="p-3 bg-muted/50 rounded-md text-sm">
+                            {currentChapter.summary}
+                        </div>
+                    </div>
+                </>
+            )}
         </div>
     );
 }
