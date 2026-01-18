@@ -228,16 +228,14 @@ export function RelationshipsTable() {
             )}
 
             {/* 关系图 */}
-            {table.rows.length > 0 && (
-                <div className="mt-4 border rounded-lg overflow-hidden">
-                    <div className="p-2 bg-muted/50 text-sm font-medium">
-                        关系图
-                    </div>
-                    <div className="h-[300px]">
-                        <CharacterGraph embedded />
-                    </div>
+            <div className="mt-4 border rounded-lg overflow-hidden">
+                <div className="p-2 bg-muted/50 text-sm font-medium">
+                    关系图
                 </div>
-            )}
+                <div className="h-[300px]">
+                    <CharacterGraph embedded />
+                </div>
+            </div>
         </div>
     );
 }
