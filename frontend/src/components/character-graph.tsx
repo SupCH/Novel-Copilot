@@ -255,7 +255,7 @@ export function CharacterGraph({ isOpen = true, onClose, embedded = false }: Cha
                 className="bg-background"
             >
                 <Background />
-                <Controls showMinimap={false} />
+                <Controls />
             </ReactFlow>
         );
     }
