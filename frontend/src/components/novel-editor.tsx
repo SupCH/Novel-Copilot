@@ -50,6 +50,15 @@ export function NovelEditor() {
     const [alertDialog, setAlertDialog] = useState<{ open: boolean; title: string; message: string; type: "success" | "error" | "info" } | null>(null);
     // 章节选择弹窗状态
     const [summarySelectOpen, setSummarySelectOpen] = useState(false);
+    // AI 修改待确认状态
+    const [pendingModify, setPendingModify] = useState<{
+        original: string;
+        modified: string;
+        action: string;
+        selectionFrom: number;
+        selectionTo: number;
+    } | null>(null);
+    const [isModifying, setIsModifying] = useState(false);
 
     // 编辑器扩展配置
     const editorExtensions = useMemo(() => [
@@ -338,9 +347,14 @@ export function NovelEditor() {
         handleAIContinue();
     }, [handleAIContinue]);
 
-    // AI 文字修改
+    // AI 文字修改 - 设置待确认状态
     const handleAIModify = useCallback(async (action: string, text: string) => {
-        if (!editor) return;
+        if (!editor || isModifying) return;
+
+        // 保存选区位置
+        const { from, to } = editor.state.selection;
+
+        setIsModifying(true);
         try {
             const response = await aiApi.modifyText({
                 text,
@@ -348,7 +362,14 @@ export function NovelEditor() {
                 config: aiConfig,
             });
             if (response.success && response.result) {
-                editor.commands.insertContent(response.result);
+                // 设置待确认状态，不直接插入
+                setPendingModify({
+                    original: text,
+                    modified: response.result,
+                    action,
+                    selectionFrom: from,
+                    selectionTo: to,
+                });
             } else {
                 setAlertDialog({
                     open: true,
@@ -365,8 +386,39 @@ export function NovelEditor() {
                 message: "请检查网络连接和 AI 配置",
                 type: "error",
             });
+        } finally {
+            setIsModifying(false);
         }
-    }, [editor, aiConfig]);
+    }, [editor, aiConfig, isModifying]);
+
+    // AI 修改 - 接受
+    const handleModifyAccept = useCallback(() => {
+        if (!editor || !pendingModify) return;
+
+        // 删除原文并插入修改后的内容
+        editor
+            .chain()
+            .focus()
+            .setTextSelection({ from: pendingModify.selectionFrom, to: pendingModify.selectionTo })
+            .deleteSelection()
+            .insertContent(pendingModify.modified)
+            .run();
+
+        setPendingModify(null);
+    }, [editor, pendingModify]);
+
+    // AI 修改 - 拒绝
+    const handleModifyReject = useCallback(() => {
+        setPendingModify(null);
+    }, []);
+
+    // AI 修改 - 重写
+    const handleModifyRegenerate = useCallback(() => {
+        if (!pendingModify) return;
+        const { original, action } = pendingModify;
+        setPendingModify(null);
+        handleAIModify(action, original);
+    }, [pendingModify, handleAIModify]);
 
     // 快捷键
     useEffect(() => {
@@ -446,6 +498,60 @@ export function NovelEditor() {
                     </Button>
                 </div>
             </div>
+
+            {/* AI 修改预览面板 */}
+            {pendingModify && (
+                <div className="border-b p-3 bg-amber-50 dark:bg-amber-950/20">
+                    <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm font-medium text-amber-700 dark:text-amber-400">
+                            AI 修改预览
+                        </span>
+                        <div className="flex gap-2">
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={handleModifyRegenerate}
+                                disabled={isModifying}
+                                className="h-7 text-xs"
+                            >
+                                <RefreshCw className={`h-3 w-3 mr-1 ${isModifying ? 'animate-spin' : ''}`} />
+                                重写
+                            </Button>
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={handleModifyReject}
+                                className="h-7 text-xs text-red-600 hover:text-red-700"
+                            >
+                                <X className="h-3 w-3 mr-1" />
+                                拒绝
+                            </Button>
+                            <Button
+                                size="sm"
+                                onClick={handleModifyAccept}
+                                className="h-7 text-xs"
+                            >
+                                <Check className="h-3 w-3 mr-1" />
+                                接受
+                            </Button>
+                        </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3 text-sm">
+                        <div className="p-2 rounded bg-red-100 dark:bg-red-900/30 border border-red-200 dark:border-red-800">
+                            <div className="text-xs text-red-600 dark:text-red-400 mb-1 font-medium">原文</div>
+                            <div className="line-through text-red-700 dark:text-red-300 whitespace-pre-wrap">
+                                {pendingModify.original}
+                            </div>
+                        </div>
+                        <div className="p-2 rounded bg-green-100 dark:bg-green-900/30 border border-green-200 dark:border-green-800">
+                            <div className="text-xs text-green-600 dark:text-green-400 mb-1 font-medium">修改后</div>
+                            <div className="text-green-700 dark:text-green-300 whitespace-pre-wrap">
+                                {pendingModify.modified}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* 编辑器 */}
             <div
