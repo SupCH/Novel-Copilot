@@ -15,9 +15,10 @@ import {
 } from "@/components/ui/dialog";
 import { ChevronDown, ChevronRight, Plus, Trash2, RefreshCw, Check, X, Network, Sparkles, ExternalLink } from "lucide-react";
 import { CharacterGraph } from "@/components/character-graph";
+import { ChapterSelectDialog } from "@/components/chapter-select-dialog";
 
 export function DataTablesPanel() {
-    const { currentProject, currentChapter, aiConfig, dataTablesRefreshKey, refreshDataTables } = useAppStore();
+    const { currentProject, currentChapter, chapters, aiConfig, dataTablesRefreshKey, refreshDataTables } = useAppStore();
     const [tables, setTables] = useState<DataTableResponse[]>([]);
     const [expandedTables, setExpandedTables] = useState<Set<number>>(new Set([1, 2]));
     const [loading, setLoading] = useState(false);
@@ -40,6 +41,9 @@ export function DataTablesPanel() {
     // 一键整理状态
     const [isOrganizing, setIsOrganizing] = useState(false);
     const [organizeResult, setOrganizeResult] = useState<{ success: boolean; message: string } | null>(null);
+    // 章节选择弹窗
+    const [chapterSelectOpen, setChapterSelectOpen] = useState(false);
+    const [chapterSelectAction, setChapterSelectAction] = useState<"organize" | "extract" | null>(null);
 
     // 列宽状态 (按表格类型存储)
     const [columnWidths, setColumnWidths] = useState<Record<number, Record<number, number>>>({});
@@ -296,25 +300,10 @@ export function DataTablesPanel() {
                         variant="outline"
                         size="sm"
                         className="h-7 text-xs gap-1"
-                        disabled={isOrganizing}
-                        onClick={async () => {
-                            if (!currentProject) return;
-                            setIsOrganizing(true);
-                            setOrganizeResult(null);
-                            try {
-                                const result = await aiApi.organizeCharacters({
-                                    projectId: currentProject.id,
-                                    config: aiConfig,
-                                });
-                                refreshDataTables();
-                                setOrganizeResult({ success: result.success, message: result.message });
-                            } catch (error) {
-                                console.error('Organize error:', error);
-                                setOrganizeResult({ success: false, message: '整理失败' });
-                            } finally {
-                                setIsOrganizing(false);
-                                setTimeout(() => setOrganizeResult(null), 3000);
-                            }
+                        disabled={isOrganizing || chapters.length === 0}
+                        onClick={() => {
+                            setChapterSelectAction("organize");
+                            setChapterSelectOpen(true);
                         }}
                         title="AI 一键整理人物关系"
                     >
@@ -532,6 +521,38 @@ export function DataTablesPanel() {
 
             {/* 关系图弹窗 */}
             <CharacterGraph isOpen={graphOpen} onClose={() => setGraphOpen(false)} />
+
+            {/* 章节选择弹窗 */}
+            <ChapterSelectDialog
+                open={chapterSelectOpen}
+                onOpenChange={setChapterSelectOpen}
+                chapters={chapters}
+                title={chapterSelectAction === "organize" ? "选择要整理的章节" : "选择要提取的章节"}
+                onConfirm={async (selectedChapterIds) => {
+                    if (!currentProject || selectedChapterIds.length === 0) return;
+
+                    if (chapterSelectAction === "organize") {
+                        setIsOrganizing(true);
+                        setOrganizeResult(null);
+                        try {
+                            const result = await aiApi.organizeCharacters({
+                                projectId: currentProject.id,
+                                chapterIds: selectedChapterIds,
+                                config: aiConfig,
+                            });
+                            refreshDataTables();
+                            setOrganizeResult({ success: result.success, message: result.message });
+                        } catch (error) {
+                            console.error('Organize error:', error);
+                            setOrganizeResult({ success: false, message: '整理失败' });
+                        } finally {
+                            setIsOrganizing(false);
+                            setTimeout(() => setOrganizeResult(null), 3000);
+                        }
+                    }
+                    setChapterSelectAction(null);
+                }}
+            />
         </div>
     );
 }

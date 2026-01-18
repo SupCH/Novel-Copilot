@@ -401,6 +401,7 @@ async def extract_data(data: ExtractDataRequest, db: AsyncSession = Depends(get_
 class OrganizeCharactersRequest(BaseModel):
     """整理人物请求"""
     project_id: int
+    chapter_ids: Optional[list[int]] = None
     model: str = "gpt-4o-mini"
     api_base: Optional[str] = None
     api_key: Optional[str] = None
@@ -420,10 +421,12 @@ async def organize_characters(data: OrganizeCharactersRequest, db: AsyncSession 
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
     
-    # 获取所有章节内容
-    chapters_result = await db.execute(
-        select(Chapter).where(Chapter.project_id == data.project_id).order_by(Chapter.rank)
-    )
+    # 获取章节内容（根据选中的章节 ID 过滤）
+    query = select(Chapter).where(Chapter.project_id == data.project_id)
+    if data.chapter_ids:
+        query = query.where(Chapter.id.in_(data.chapter_ids))
+    query = query.order_by(Chapter.rank)
+    chapters_result = await db.execute(query)
     chapters = chapters_result.scalars().all()
     
     if not chapters:

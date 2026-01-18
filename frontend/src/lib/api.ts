@@ -325,6 +325,7 @@ export const aiApi = {
     },
     organizeCharacters: (data: {
         projectId: number;
+        chapterIds?: number[];
         config?: { baseUrl?: string; apiKey?: string; model?: string };
     }) => {
         return request<{
@@ -336,6 +337,7 @@ export const aiApi = {
             method: "POST",
             body: JSON.stringify({
                 project_id: data.projectId,
+                chapter_ids: data.chapterIds,
                 model: data.config?.model || "gpt-4o-mini",
                 api_base: data.config?.baseUrl || undefined,
                 api_key: data.config?.apiKey || undefined,
