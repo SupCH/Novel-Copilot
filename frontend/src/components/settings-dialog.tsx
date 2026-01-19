@@ -134,14 +134,14 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-[500px]">
+            <DialogContent className="sm:max-w-[480px] max-h-[85vh] overflow-hidden flex flex-col">
                 <DialogHeader>
                     <DialogTitle>AI 设置</DialogTitle>
                     <DialogDescription>
-                        配置 AI 服务的连接信息。默认支持本地 Ollama。
+                        配置 AI 服务连接信息
                     </DialogDescription>
                 </DialogHeader>
-                <div className="grid gap-4 py-4">
+                <div className="grid gap-3 py-3 overflow-y-auto flex-1 pr-2">
                     <div className="grid grid-cols-4 items-center gap-4">
                         <Label htmlFor="base-url" className="text-right">
                             API 地址
@@ -415,7 +415,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                                         });
                                         // 过滤出图像模型（通常包含 flux, dall, stable, kolors 等关键词）
                                         const imgModels = models.filter(m =>
-                                            /flux|dall|stable|kolors|midjourney|image|diffusion|sdxl/i.test(m)
+                                            /flux|dall|stable|kolors|midjourney|image|diffusion|sdxl|gemini.*image/i.test(m)
                                         );
                                         setImageModels(imgModels.length > 0 ? imgModels : models);
                                         setImageCheckStatus("success");
@@ -423,8 +423,15 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                                             setConfig(prev => ({ ...prev, imageModel: imgModels[0] }));
                                         }
                                     } catch (error) {
-                                        setImageCheckStatus("error");
-                                        setImageErrorMessage(error instanceof Error ? error.message : "连接失败");
+                                        // 404 表示 API 不支持模型列表，这是正常的
+                                        const errMsg = error instanceof Error ? error.message : "连接失败";
+                                        if (errMsg.includes("404") || errMsg.includes("Not Found")) {
+                                            setImageCheckStatus("success");
+                                            setImageErrorMessage("此 API 不支持模型列表，请手动输入");
+                                        } else {
+                                            setImageCheckStatus("error");
+                                            setImageErrorMessage(errMsg);
+                                        }
                                     } finally {
                                         setIsCheckingImage(false);
                                     }
