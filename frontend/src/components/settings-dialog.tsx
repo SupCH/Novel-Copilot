@@ -31,6 +31,12 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
     const [isTestingModel, setIsTestingModel] = useState(false);
     const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
 
+    // 图像模型状态
+    const [imageModels, setImageModels] = useState<string[]>([]);
+    const [isCheckingImage, setIsCheckingImage] = useState(false);
+    const [imageCheckStatus, setImageCheckStatus] = useState<"idle" | "success" | "error">("idle");
+    const [imageErrorMessage, setImageErrorMessage] = useState("");
+
     // 当 store 更新或对话框打开时，同步状态（处理旧配置缺少新字段的情况）
     useEffect(() => {
         if (open) {
@@ -358,17 +364,85 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                         />
                     </div>
 
+                    {/* 图像连接测试区域 */}
+                    <div className="grid grid-cols-4 items-center gap-4">
+                        <div className="col-start-2 col-span-3 flex items-center gap-2">
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={async () => {
+                                    setIsCheckingImage(true);
+                                    setImageCheckStatus("idle");
+                                    setImageErrorMessage("");
+                                    setImageModels([]);
+                                    try {
+                                        const { models } = await aiApi.getModels({
+                                            baseUrl: config.imageBaseUrl,
+                                            apiKey: config.imageApiKey,
+                                        });
+                                        // 过滤出图像模型（通常包含 flux, dall, stable, kolors 等关键词）
+                                        const imgModels = models.filter(m =>
+                                            /flux|dall|stable|kolors|midjourney|image|diffusion|sdxl/i.test(m)
+                                        );
+                                        setImageModels(imgModels.length > 0 ? imgModels : models);
+                                        setImageCheckStatus("success");
+                                        if (imgModels.length > 0 && (!config.imageModel || !imgModels.includes(config.imageModel))) {
+                                            setConfig(prev => ({ ...prev, imageModel: imgModels[0] }));
+                                        }
+                                    } catch (error) {
+                                        setImageCheckStatus("error");
+                                        setImageErrorMessage(error instanceof Error ? error.message : "连接失败");
+                                    } finally {
+                                        setIsCheckingImage(false);
+                                    }
+                                }}
+                                disabled={isCheckingImage}
+                            >
+                                {isCheckingImage && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                测试连接 & 获取模型
+                            </Button>
+
+                            {imageCheckStatus === "success" && (
+                                <span className="flex items-center text-sm text-green-600">
+                                    <CheckCircle2 className="mr-1 h-4 w-4" />
+                                    找到 {imageModels.length} 个模型
+                                </span>
+                            )}
+
+                            {imageCheckStatus === "error" && (
+                                <span className="flex items-center text-sm text-red-600" title={imageErrorMessage}>
+                                    <XCircle className="mr-1 h-4 w-4" />
+                                    {imageErrorMessage || "连接失败"}
+                                </span>
+                            )}
+                        </div>
+                    </div>
+
                     <div className="grid grid-cols-4 items-center gap-4">
                         <Label htmlFor="image-model" className="text-right">
                             图像模型
                         </Label>
                         <div className="col-span-3">
-                            <Input
-                                id="image-model"
-                                value={config.imageModel}
-                                onChange={(e) => setConfig({ ...config, imageModel: e.target.value })}
-                                placeholder="black-forest-labs/FLUX.1-schnell"
-                            />
+                            {imageModels.length > 0 ? (
+                                <select
+                                    id="image-model"
+                                    value={config.imageModel}
+                                    onChange={(e) => setConfig({ ...config, imageModel: e.target.value })}
+                                    className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm"
+                                >
+                                    {imageModels.map(m => (
+                                        <option key={m} value={m}>{m}</option>
+                                    ))}
+                                </select>
+                            ) : (
+                                <Input
+                                    id="image-model"
+                                    value={config.imageModel}
+                                    onChange={(e) => setConfig({ ...config, imageModel: e.target.value })}
+                                    placeholder="black-forest-labs/FLUX.1-schnell"
+                                />
+                            )}
                             <p className="text-xs text-muted-foreground mt-1">
                                 {config.imageProvider === 'siliconflow' ? '推荐: FLUX.1-schnell (快速) 或 Kolors' :
                                     config.imageProvider === 'openai' ? '推荐: dall-e-3' : '输入模型名称'}
