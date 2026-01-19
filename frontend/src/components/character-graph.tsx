@@ -66,6 +66,8 @@ function CharacterNode({ data, selected }: NodeProps) {
         return () => clearInterval(interval);
     }, [label, currentProject]);
 
+    const [imgError, setImgError] = useState(false);
+
     return (
         <div
             style={{
@@ -91,7 +93,7 @@ function CharacterNode({ data, selected }: NodeProps) {
                     height: "28px",
                     borderRadius: "50%",
                     overflow: "hidden",
-                    border: avatarUrl ? "2px solid #3b82f6" : "2px solid #d1d5db",
+                    border: avatarUrl && !imgError ? "2px solid #3b82f6" : "2px solid #d1d5db",
                     background: "#f3f4f6",
                     display: "flex",
                     alignItems: "center",
@@ -99,8 +101,13 @@ function CharacterNode({ data, selected }: NodeProps) {
                     flexShrink: 0,
                 }}
             >
-                {avatarUrl ? (
-                    <img src={avatarUrl} alt={label} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                {avatarUrl && !imgError ? (
+                    <img
+                        src={avatarUrl}
+                        alt={label}
+                        style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                        onError={() => setImgError(true)}
+                    />
                 ) : (
                     <User style={{ width: "14px", height: "14px", color: "#9ca3af" }} />
                 )}

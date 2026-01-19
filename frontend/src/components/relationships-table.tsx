@@ -65,14 +65,21 @@ function CharacterAvatar({ characterName, projectId }: { characterName: string; 
         }
     };
 
+    const [imgError, setImgError] = useState(false);
+
     return (
         <div
-            className={`h-8 w-8 shrink-0 rounded-full overflow-hidden border-2 ${avatarUrl ? 'border-primary cursor-pointer' : 'border-muted'} bg-muted flex items-center justify-center`}
+            className={`h-8 w-8 shrink-0 rounded-full overflow-hidden border-2 ${avatarUrl && !imgError ? 'border-primary cursor-pointer' : 'border-muted'} bg-muted flex items-center justify-center`}
             onClick={handleClick}
-            title={avatarUrl ? '点击查看头像' : '暂无头像'}
+            title={avatarUrl && !imgError ? '点击查看头像' : '暂无头像'}
         >
-            {avatarUrl ? (
-                <img src={avatarUrl} alt={characterName} className="h-full w-full object-cover" />
+            {avatarUrl && !imgError ? (
+                <img
+                    src={avatarUrl}
+                    alt={characterName}
+                    className="h-full w-full object-cover"
+                    onError={() => setImgError(true)}
+                />
             ) : (
                 <User className="h-4 w-4 text-muted-foreground" />
             )}
