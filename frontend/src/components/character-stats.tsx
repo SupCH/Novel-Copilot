@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useAppStore } from "@/store/app-store";
+import { dataTablesApi, DataTableResponse } from "@/lib/api";
 import { BarChart3, User } from "lucide-react";
 
 interface CharacterAppearance {
@@ -11,42 +12,58 @@ interface CharacterAppearance {
 }
 
 export function CharacterStats() {
-    const { chapters, characters } = useAppStore();
+    const { currentProject, chapters, dataTablesRefreshKey } = useAppStore();
+    const [table, setTable] = useState<DataTableResponse | null>(null);
+
+    // 从数据表加载角色（table_type = 2 是社交关系表）
+    useEffect(() => {
+        if (!currentProject) return;
+
+        dataTablesApi.list(currentProject.id)
+            .then(tables => {
+                const relationshipTable = tables.find(t => t.table_type === 2);
+                setTable(relationshipTable || null);
+            })
+            .catch(console.error);
+    }, [currentProject, dataTablesRefreshKey]);
+
+    // 从数据表的第一列提取角色名列表
+    const characterNames = useMemo(() => {
+        if (!table || !table.rows.length) return [];
+        return [...new Set(table.rows.map(row => row[0]).filter(Boolean))] as string[];
+    }, [table]);
 
     // 计算每个角色在各章节的出场次数
     const stats = useMemo<CharacterAppearance[]>(() => {
-        if (!characters.length || !chapters.length) return [];
+        if (!characterNames.length || !chapters.length) return [];
 
-        return characters.map(char => {
+        return characterNames.map(name => {
             const chaptersData = chapters.map(ch => {
-                // 从 characters_mentioned 字段统计（存储的是角色 ID）
-                const mentioned = ch.characters_mentioned || [];
-                const count = mentioned.filter((id: number) => id === char.id).length;
-
-                // 如果没有 characters_mentioned，从内容中简单统计
+                // 从章节内容中统计角色名出现次数
                 const contentCount = ch.content
-                    ? (ch.content.match(new RegExp(char.name, 'gi')) || []).length
+                    ? (ch.content.match(new RegExp(name, 'gi')) || []).length
                     : 0;
 
                 return {
                     title: ch.title,
-                    count: count || contentCount
+                    count: contentCount
                 };
             });
 
             return {
-                name: char.name,
+                name,
                 total: chaptersData.reduce((sum, c) => sum + c.count, 0),
                 chapters: chaptersData.filter(c => c.count > 0)
             };
         }).sort((a, b) => b.total - a.total);
-    }, [characters, chapters]);
+    }, [characterNames, chapters]);
 
-    if (!characters.length) {
+    if (!characterNames.length) {
         return (
             <div className="p-4 text-center text-muted-foreground text-sm">
                 <User className="h-8 w-8 mx-auto mb-2 opacity-50" />
                 <p>暂无角色数据</p>
+                <p className="text-xs mt-1">使用"一键整理"或在"关系"页添加角色</p>
             </div>
         );
     }
@@ -55,7 +72,7 @@ export function CharacterStats() {
         <div className="p-3 space-y-3">
             <div className="flex items-center gap-2">
                 <BarChart3 className="h-4 w-4" />
-                <span className="text-sm font-medium">角色出场统计</span>
+                <span className="text-sm font-medium">角色出场统计 ({characterNames.length}人)</span>
             </div>
 
             <div className="space-y-2">
@@ -77,14 +94,16 @@ export function CharacterStats() {
                         </div>
 
                         {/* 进度条 */}
-                        <div className="h-2 bg-muted rounded-full overflow-hidden mb-2">
-                            <div
-                                className="h-full bg-primary/60 rounded-full transition-all"
-                                style={{
-                                    width: `${Math.min(100, (stat.total / Math.max(...stats.map(s => s.total))) * 100)}%`
-                                }}
-                            />
-                        </div>
+                        {stats.length > 0 && stats[0].total > 0 && (
+                            <div className="h-2 bg-muted rounded-full overflow-hidden mb-2">
+                                <div
+                                    className="h-full bg-primary/60 rounded-full transition-all"
+                                    style={{
+                                        width: `${Math.min(100, (stat.total / stats[0].total) * 100)}%`
+                                    }}
+                                />
+                            </div>
+                        )}
 
                         {/* 章节分布 */}
                         {stat.chapters.length > 0 && (
