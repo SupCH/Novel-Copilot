@@ -19,9 +19,11 @@ import { RelationshipsTable } from "@/components/relationships-table";
 import { OutlinePanel } from "@/components/outline-panel";
 import { useAppStore } from "@/store/app-store";
 import { charactersApi, relationshipsApi, projectsApi } from "@/lib/api";
-import { Settings, Network, Plus, User, Pencil, Table2, BookOpen, History } from "lucide-react";
+import { Settings, Network, Plus, User, Pencil, Table2, BookOpen, History, BarChart3, GitBranch } from "lucide-react";
 import type { Character } from "@/lib/api";
 import { SnapshotPanel } from "@/components/snapshot-panel";
+import { CharacterStats } from "@/components/character-stats";
+import { RelationshipTimeline } from "@/components/relationship-timeline";
 
 export function RightPanel() {
     const {
@@ -271,7 +273,15 @@ export function RightPanel() {
                         </div>
                     </ScrollArea>
                 ) : rightPanelTab === "graph" ? (
-                    <RelationshipsTable />
+                    <ScrollArea className="h-full">
+                        <RelationshipsTable />
+                        <div className="border-t">
+                            <CharacterStats />
+                        </div>
+                        <div className="border-t">
+                            <RelationshipTimeline />
+                        </div>
+                    </ScrollArea>
                 ) : rightPanelTab === "outline" ? (
                     <OutlinePanel />
                 ) : rightPanelTab === "history" ? (

@@ -13,6 +13,7 @@ import { CharacterHoverCard, CharacterData } from "@/components/character-hover-
 import { CharacterHighlight, updateCharacterNames } from "@/lib/character-highlight";
 import { AlertDialog, InputDialog } from "@/components/ui/custom-dialog";
 import { ChapterSelectDialog } from "@/components/chapter-select-dialog";
+import { StatusBar } from "@/components/status-bar";
 
 export function NovelEditor() {
     const {
@@ -760,6 +761,9 @@ export function NovelEditor() {
                     });
                 }}
             />
+
+            {/* 底部状态栏 */}
+            <StatusBar />
         </div>
     );
 }
