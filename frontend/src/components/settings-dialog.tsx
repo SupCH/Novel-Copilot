@@ -325,16 +325,48 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                         <Label htmlFor="image-provider" className="text-right">
                             图像服务
                         </Label>
-                        <select
-                            id="image-provider"
-                            value={config.imageProvider}
-                            onChange={(e) => setConfig({ ...config, imageProvider: e.target.value as 'openai' | 'siliconflow' | 'custom' })}
-                            className="col-span-3 h-9 rounded-md border border-input bg-background px-3 text-sm"
-                        >
-                            <option value="siliconflow">硅基流动 SiliconFlow</option>
-                            <option value="openai">OpenAI DALL-E</option>
-                            <option value="custom">自定义</option>
-                        </select>
+                        <div className="col-span-3">
+                            <select
+                                id="image-provider"
+                                value={config.imageProvider}
+                                onChange={(e) => {
+                                    const provider = e.target.value as 'openai' | 'siliconflow' | 'custom';
+                                    // 根据服务商自动填充预设值
+                                    const presets = {
+                                        siliconflow: {
+                                            imageBaseUrl: 'https://api.siliconflow.cn/v1',
+                                            imageModel: 'black-forest-labs/FLUX.1-schnell',
+                                        },
+                                        openai: {
+                                            imageBaseUrl: 'https://api.openai.com/v1',
+                                            imageModel: 'dall-e-3',
+                                        },
+                                        custom: {
+                                            imageBaseUrl: config.imageBaseUrl,
+                                            imageModel: config.imageModel,
+                                        },
+                                    };
+                                    setConfig({
+                                        ...config,
+                                        imageProvider: provider,
+                                        imageBaseUrl: presets[provider].imageBaseUrl,
+                                        imageModel: presets[provider].imageModel,
+                                    });
+                                    setImageModels([]); // 清空已获取的模型列表
+                                    setImageCheckStatus("idle");
+                                }}
+                                className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm"
+                            >
+                                <option value="siliconflow">硅基流动 SiliconFlow（推荐，免费）</option>
+                                <option value="openai">OpenAI DALL-E</option>
+                                <option value="custom">自定义 API</option>
+                            </select>
+                            <p className="text-xs text-muted-foreground mt-1">
+                                {config.imageProvider === 'siliconflow' && '免费额度充足，支持 FLUX、Kolors 等模型'}
+                                {config.imageProvider === 'openai' && '需要 OpenAI API Key，支持 DALL-E 2/3'}
+                                {config.imageProvider === 'custom' && '自定义 OpenAI 兼容的图像生成 API'}
+                            </p>
+                        </div>
                     </div>
 
                     <div className="grid grid-cols-4 items-center gap-4">
