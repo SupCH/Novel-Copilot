@@ -119,7 +119,7 @@ export function RightPanel() {
     return (
         <div className="h-full flex flex-col border-l">
             {/* Tab 切换 */}
-            <div className="border-b p-2 flex gap-1">
+            <div className="border-b p-2 flex flex-wrap gap-1">
                 <Button
                     variant={rightPanelTab === "settings" ? "secondary" : "ghost"}
                     size="sm"
