@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useAppStore } from "@/store/app-store";
 import { snapshotsApi, Snapshot } from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -13,7 +13,10 @@ import {
     DialogDescription,
     DialogFooter,
 } from "@/components/ui/dialog";
-import { History, Plus, RotateCcw, Trash2, Clock, RefreshCw } from "lucide-react";
+import { History, Plus, RotateCcw, Trash2, Clock, RefreshCw, Settings2, Play, Pause } from "lucide-react";
+
+// 自动快照配置 key
+const AUTO_SNAPSHOT_KEY = "novel-copilot-auto-snapshot";
 
 export function SnapshotPanel() {
     const { currentProject, refreshDataTables } = useAppStore();
@@ -26,6 +29,49 @@ export function SnapshotPanel() {
     const [selectedSnapshot, setSelectedSnapshot] = useState<Snapshot | null>(null);
     const [isRestoring, setIsRestoring] = useState(false);
     const [isCreating, setIsCreating] = useState(false);
+
+    // 自动快照状态
+    const [autoEnabled, setAutoEnabled] = useState(false);
+    const [autoInterval, setAutoInterval] = useState(10); // 分钟
+    const [settingsOpen, setSettingsOpen] = useState(false);
+    const [lastAutoSave, setLastAutoSave] = useState<Date | null>(null);
+    const timerRef = useRef<NodeJS.Timeout | null>(null);
+
+    // 加载自动快照配置
+    useEffect(() => {
+        const saved = localStorage.getItem(AUTO_SNAPSHOT_KEY);
+        if (saved) {
+            try {
+                const config = JSON.parse(saved);
+                setAutoEnabled(config.enabled ?? false);
+                setAutoInterval(config.interval ?? 10);
+            } catch {
+                // ignore
+            }
+        }
+    }, []);
+
+    // 保存自动快照配置
+    const saveAutoConfig = (enabled: boolean, interval: number) => {
+        localStorage.setItem(AUTO_SNAPSHOT_KEY, JSON.stringify({ enabled, interval }));
+    };
+
+    // 创建自动快照
+    const createAutoSnapshot = useCallback(async () => {
+        if (!currentProject) return;
+        try {
+            await snapshotsApi.create({
+                project_id: currentProject.id,
+                name: `自动快照 ${new Date().toLocaleString("zh-CN")}`,
+                snapshot_type: "auto",
+            });
+            setLastAutoSave(new Date());
+            loadSnapshots();
+            console.log("[AutoSnapshot] Created at", new Date().toLocaleString());
+        } catch (error) {
+            console.error("[AutoSnapshot] Failed:", error);
+        }
+    }, [currentProject]);
 
     // 加载快照列表
     const loadSnapshots = useCallback(async () => {
@@ -44,6 +90,42 @@ export function SnapshotPanel() {
     useEffect(() => {
         loadSnapshots();
     }, [loadSnapshots]);
+
+    // 自动快照定时器
+    useEffect(() => {
+        if (timerRef.current) {
+            clearInterval(timerRef.current);
+            timerRef.current = null;
+        }
+
+        if (autoEnabled && currentProject) {
+            const intervalMs = autoInterval * 60 * 1000;
+            timerRef.current = setInterval(() => {
+                createAutoSnapshot();
+            }, intervalMs);
+            console.log(`[AutoSnapshot] Timer started: every ${autoInterval} min`);
+        }
+
+        return () => {
+            if (timerRef.current) {
+                clearInterval(timerRef.current);
+            }
+        };
+    }, [autoEnabled, autoInterval, currentProject, createAutoSnapshot]);
+
+    // 切换自动快照
+    const toggleAutoSnapshot = () => {
+        const newEnabled = !autoEnabled;
+        setAutoEnabled(newEnabled);
+        saveAutoConfig(newEnabled, autoInterval);
+    };
+
+    // 更新间隔
+    const updateInterval = (value: number) => {
+        const interval = Math.max(1, Math.min(60, value));
+        setAutoInterval(interval);
+        saveAutoConfig(autoEnabled, interval);
+    };
 
     // 创建快照
     const handleCreate = async () => {
@@ -68,6 +150,8 @@ export function SnapshotPanel() {
         }
     };
 
+    // ... 其余代码保持不变
+
     // 恢复快照
     const handleRestore = async () => {
         if (!selectedSnapshot) return;
@@ -76,7 +160,6 @@ export function SnapshotPanel() {
             await snapshotsApi.restore(selectedSnapshot.id);
             setRestoreDialogOpen(false);
             setSelectedSnapshot(null);
-            // 刷新页面数据
             refreshDataTables();
             window.location.reload();
         } catch (error) {
@@ -126,16 +209,44 @@ export function SnapshotPanel() {
                     <History className="h-4 w-4" />
                     <span className="text-sm font-medium">版本历史</span>
                 </div>
-                <Button
-                    size="sm"
-                    variant="outline"
-                    className="h-7 text-xs gap-1"
-                    onClick={() => setCreateDialogOpen(true)}
-                >
-                    <Plus className="h-3 w-3" />
-                    创建快照
-                </Button>
+                <div className="flex gap-1">
+                    <Button
+                        size="sm"
+                        variant={autoEnabled ? "default" : "ghost"}
+                        className="h-7 w-7 p-0"
+                        onClick={toggleAutoSnapshot}
+                        title={autoEnabled ? `自动快照已开启 (每${autoInterval}分钟)` : "开启自动快照"}
+                    >
+                        {autoEnabled ? <Pause className="h-3 w-3" /> : <Play className="h-3 w-3" />}
+                    </Button>
+                    <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 w-7 p-0"
+                        onClick={() => setSettingsOpen(true)}
+                        title="快照设置"
+                    >
+                        <Settings2 className="h-3 w-3" />
+                    </Button>
+                    <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 text-xs gap-1"
+                        onClick={() => setCreateDialogOpen(true)}
+                    >
+                        <Plus className="h-3 w-3" />
+                        创建
+                    </Button>
+                </div>
             </div>
+
+            {/* 自动快照状态 */}
+            {autoEnabled && (
+                <div className="text-xs text-muted-foreground bg-blue-50 dark:bg-blue-950/30 p-2 rounded flex items-center gap-2">
+                    <RefreshCw className="h-3 w-3 animate-spin" />
+                    <span>自动快照已开启，每 {autoInterval} 分钟保存一次</span>
+                </div>
+            )}
 
             {/* 快照列表 */}
             {loading ? (
@@ -263,6 +374,54 @@ export function SnapshotPanel() {
                         </Button>
                         <Button variant="destructive" onClick={handleRestore} disabled={isRestoring}>
                             {isRestoring ? "恢复中..." : "确认恢复"}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* 设置对话框 */}
+            <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>快照设置</DialogTitle>
+                        <DialogDescription>
+                            配置自动快照的保存间隔。
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4 py-2">
+                        <div>
+                            <label className="text-sm font-medium">自动快照间隔（分钟）</label>
+                            <Input
+                                type="number"
+                                min={1}
+                                max={60}
+                                value={autoInterval}
+                                onChange={(e) => updateInterval(parseInt(e.target.value) || 10)}
+                                className="mt-1 w-32"
+                            />
+                            <p className="text-xs text-muted-foreground mt-1">
+                                建议 5-30 分钟，范围 1-60 分钟
+                            </p>
+                        </div>
+                        <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+                            <div>
+                                <p className="text-sm font-medium">自动快照</p>
+                                <p className="text-xs text-muted-foreground">
+                                    {autoEnabled ? "已开启" : "已关闭"}
+                                </p>
+                            </div>
+                            <Button
+                                size="sm"
+                                variant={autoEnabled ? "destructive" : "default"}
+                                onClick={toggleAutoSnapshot}
+                            >
+                                {autoEnabled ? "关闭" : "开启"}
+                            </Button>
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button onClick={() => setSettingsOpen(false)}>
+                            完成
                         </Button>
                     </DialogFooter>
                 </DialogContent>
