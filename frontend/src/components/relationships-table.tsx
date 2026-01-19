@@ -16,9 +16,15 @@ import {
 import { Plus, Trash2, Sparkles } from "lucide-react";
 import { CharacterGraph } from "@/components/character-graph";
 
-// 头像生成按钮组件
-function AvatarGenerateButton({ characterName }: { characterName: string }) {
-    const { aiConfig, currentProject, characters, refreshCharacters } = useAppStore();
+// 头像生成按钮组件 - 直接使用角色名和数据表信息生成
+function AvatarGenerateButton({
+    characterName,
+    bodyFeatures
+}: {
+    characterName: string;
+    bodyFeatures?: string; // 从数据表[人物]的身体特征列获取
+}) {
+    const { aiConfig, currentProject } = useAppStore();
     const [isGenerating, setIsGenerating] = useState(false);
 
     const handleGenerate = async () => {
@@ -31,26 +37,43 @@ function AvatarGenerateButton({ characterName }: { characterName: string }) {
             return;
         }
 
-        // 查找对应的角色
-        const character = characters.find(c => c.name === characterName);
-        if (!character) {
-            alert(`未找到角色 "${characterName}"，请先在设置页添加角色或使用一键整理`);
-            return;
+        // 构建提示词：角色名 + 身体特征（如果有）
+        let prompt = `Portrait of ${characterName}, anime style, detailed, high quality`;
+        if (bodyFeatures) {
+            prompt += `, ${bodyFeatures}`;
         }
 
         setIsGenerating(true);
         try {
-            const result = await aiApi.generateAvatar({
-                characterId: character.id,
-                imageConfig: {
-                    imageBaseUrl: aiConfig.imageBaseUrl,
-                    imageApiKey: aiConfig.imageApiKey,
-                    imageModel: aiConfig.imageModel,
+            // 直接调用图像生成 API
+            const response = await fetch(`${aiConfig.imageBaseUrl.replace(/\/+$/, '')}/images/generations`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${aiConfig.imageApiKey}`,
+                    'Content-Type': 'application/json',
                 },
+                body: JSON.stringify({
+                    model: aiConfig.imageModel,
+                    prompt: prompt,
+                    n: 1,
+                    size: '512x512',
+                }),
             });
-            if (result.success) {
-                refreshCharacters(); // 刷新以显示新头像
-                alert(`头像生成成功！`);
+
+            if (!response.ok) {
+                const error = await response.text();
+                throw new Error(`API 错误: ${error}`);
+            }
+
+            const data = await response.json();
+            const imageUrl = data.data?.[0]?.url || data.images?.[0]?.url;
+
+            if (imageUrl) {
+                // 在新窗口打开图片
+                window.open(imageUrl, '_blank');
+                alert('头像生成成功！已在新窗口打开');
+            } else {
+                throw new Error('未返回图片 URL');
             }
         } catch (error) {
             console.error("生成头像失败:", error);
@@ -67,7 +90,7 @@ function AvatarGenerateButton({ characterName }: { characterName: string }) {
             className="h-7 w-7 shrink-0"
             onClick={handleGenerate}
             disabled={isGenerating || !characterName.trim()}
-            title="生成 AI 头像"
+            title={`生成 AI 头像${bodyFeatures ? ' (含身体特征)' : ''}`}
         >
             {isGenerating ? (
                 <div className="h-3 w-3 animate-spin border-2 border-primary border-t-transparent rounded-full" />
@@ -238,16 +261,8 @@ export function RelationshipsTable() {
             ) : (
                 <div className="space-y-2">
                     {table.rows.map((row, rowIndex) => (
-                        <div key={rowIndex} className="p-3 rounded-lg border bg-card space-y-2 group relative">
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-6 w-6 absolute top-2 right-2 opacity-0 group-hover:opacity-100"
-                                onClick={() => deleteRow(rowIndex)}
-                            >
-                                <Trash2 className="h-3 w-3 text-destructive" />
-                            </Button>
-                            <div className="font-medium text-sm flex gap-2">
+                        <div key={rowIndex} className="p-3 rounded-lg border bg-card space-y-2 group">
+                            <div className="font-medium text-sm flex gap-2 items-center">
                                 <Input
                                     value={row[0] || ""}
                                     onChange={(e) => updateCell(rowIndex, 0, e.target.value)}
@@ -255,6 +270,15 @@ export function RelationshipsTable() {
                                     className="h-7 text-sm font-medium flex-1"
                                 />
                                 <AvatarGenerateButton characterName={row[0] || ""} />
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-7 w-7 opacity-0 group-hover:opacity-100"
+                                    onClick={() => deleteRow(rowIndex)}
+                                    title="删除"
+                                >
+                                    <Trash2 className="h-3 w-3 text-destructive" />
+                                </Button>
                             </div>
                             <div className="grid grid-cols-2 gap-2 text-xs">
                                 <div>
@@ -288,7 +312,8 @@ export function RelationshipsTable() {
                         </div>
                     ))}
                 </div>
-            )}
+            )
+            }
 
             {/* 关系图 */}
             <div className="mt-4 border rounded-lg overflow-hidden">
@@ -299,7 +324,7 @@ export function RelationshipsTable() {
                     <CharacterGraph embedded />
                 </div>
             </div>
-        </div>
+        </div >
     );
 }
 
