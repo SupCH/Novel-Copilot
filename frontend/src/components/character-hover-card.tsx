@@ -8,6 +8,8 @@ import { Input } from "@/components/ui/input";
 
 export interface CharacterData {
     name: string;
+    avatar_url?: string;
+    thumbnail_url?: string;
     traits?: string;           // 身体特征
     personality?: string;      // 性格
     role?: string;             // 职业/角色
@@ -22,6 +24,8 @@ export interface CharacterData {
         affection?: string;
     }>;
 }
+
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:3506";
 
 interface CharacterHoverCardProps {
     character: CharacterData;
@@ -38,6 +42,12 @@ export function CharacterHoverCard({ character, position, onClose, onSave }: Cha
     // 初始位置设置为屏幕外，等测量完成后再移到正确位置
     const [adjustedPosition, setAdjustedPosition] = useState({ x: -9999, y: -9999 });
     const [isPositioned, setIsPositioned] = useState(false);
+    const [imgError, setImgError] = useState(false);
+
+    const displayUrl = character.thumbnail_url
+        ? `${API_BASE}${character.thumbnail_url}`
+        : character.avatar_url;
+    const hasAvatar = displayUrl && !imgError;
 
     useEffect(() => {
         setMounted(true);
@@ -138,8 +148,17 @@ export function CharacterHoverCard({ character, position, onClose, onSave }: Cha
             <div className="p-4 border-b bg-gradient-to-r from-primary/10 to-transparent rounded-t-xl">
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
-                            <User className="w-5 h-5 text-primary" />
+                        <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center overflow-hidden shrink-0 border">
+                            {hasAvatar ? (
+                                <img
+                                    src={displayUrl}
+                                    alt={character.name}
+                                    className="h-full w-full object-cover"
+                                    onError={() => setImgError(true)}
+                                />
+                            ) : (
+                                <User className="w-5 h-5 text-primary" />
+                            )}
                         </div>
                         <div>
                             <h3 className="font-semibold text-lg">{character.name}</h3>

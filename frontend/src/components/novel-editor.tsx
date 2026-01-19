@@ -161,6 +161,8 @@ export function NovelEditor() {
                 if (row) {
                     const charData: CharacterData = {
                         name: row[0] || name,
+                        avatar_url: row[8] || "",
+                        thumbnail_url: row[9] || "",
                         traits: row[1] || "",
                         personality: row[2] || "",
                         role: row[3] || "",
