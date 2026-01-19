@@ -6,6 +6,8 @@ FastAPI 应用主文件
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+import os
 
 from database import init_db
 from routers import (
@@ -56,6 +58,11 @@ app.include_router(ai_router)
 app.include_router(data_io_router)
 app.include_router(data_tables_router)
 app.include_router(snapshots_router)
+
+# 挂载缩略图静态文件目录
+thumbnails_dir = os.path.join(os.path.dirname(__file__), "thumbnails")
+os.makedirs(thumbnails_dir, exist_ok=True)
+app.mount("/thumbnails", StaticFiles(directory=thumbnails_dir), name="thumbnails")
 
 
 @app.get("/")

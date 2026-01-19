@@ -56,6 +56,7 @@ export interface Character {
     position_x: number;
     position_y: number;
     avatar_url: string | null;
+    thumbnail_url: string | null;
     created_at: string;
     updated_at: string;
 }
@@ -358,6 +359,7 @@ export const aiApi = {
         return request<{
             success: boolean;
             avatar_url: string;
+            thumbnail_url: string;
             character_id: number;
             character_name: string;
         }>("/api/ai/generate-avatar", {
@@ -476,6 +478,11 @@ export const snapshotsApi = {
 };
 
 // 头像 API
+export interface AvatarInfo {
+    avatar_url: string;
+    thumbnail_url: string | null;
+}
+
 export const avatarApi = {
     // 保存头像 URL 到数据库
     save: (projectId: number, name: string, avatarUrl: string) =>
@@ -483,7 +490,7 @@ export const avatarApi = {
             `/api/projects/${projectId}/characters/save-avatar?name=${encodeURIComponent(name)}&avatar_url=${encodeURIComponent(avatarUrl)}`,
             { method: "POST" }
         ),
-    // 获取所有头像 URL
+    // 获取所有头像 URL（返回 { 角色名: { avatar_url, thumbnail_url } }）
     getAll: (projectId: number) =>
-        request<Record<string, string>>(`/api/projects/${projectId}/characters/avatars`),
+        request<Record<string, AvatarInfo>>(`/api/projects/${projectId}/characters/avatars`),
 };

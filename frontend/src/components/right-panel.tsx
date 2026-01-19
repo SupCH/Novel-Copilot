@@ -10,7 +10,6 @@ import {
     DialogContent,
     DialogHeader,
     DialogTitle,
-    DialogTrigger,
     DialogFooter,
 } from "@/components/ui/dialog";
 import { CharacterGraph } from "@/components/character-graph";
@@ -19,7 +18,7 @@ import { RelationshipsTable } from "@/components/relationships-table";
 import { OutlinePanel } from "@/components/outline-panel";
 import { useAppStore } from "@/store/app-store";
 import { charactersApi, relationshipsApi, projectsApi, aiApi } from "@/lib/api";
-import { Settings, Network, Plus, User, Pencil, Table2, BookOpen, History, BarChart3, GitBranch, Sparkles } from "lucide-react";
+import { Settings, Network, User, Pencil, Table2, BookOpen, History, BarChart3, Sparkles } from "lucide-react";
 import type { Character } from "@/lib/api";
 import { SnapshotPanel } from "@/components/snapshot-panel";
 import { CharacterStats } from "@/components/character-stats";
@@ -303,6 +302,9 @@ export function RightPanel() {
     );
 }
 
+// API Base URL for thumbnail
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:3506";
+
 function CharacterCard({
     character,
     onDelete,
@@ -314,6 +316,7 @@ function CharacterCard({
 }) {
     const { aiConfig } = useAppStore();
     const [isGenerating, setIsGenerating] = useState(false);
+    const [imgError, setImgError] = useState(false);
 
     const handleGenerateAvatar = async () => {
         if (!aiConfig.imageApiKey) {
@@ -332,6 +335,7 @@ function CharacterCard({
                 },
             });
             if (result.success && result.avatar_url) {
+                // 后端现在返回 avatar_url 和 thumbnail_url，但 onAvatarGenerated 可能只需要通知刷新
                 onAvatarGenerated?.(result.avatar_url);
             }
         } catch (error) {
@@ -342,23 +346,39 @@ function CharacterCard({
         }
     };
 
+    const handleAvatarClick = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (character.avatar_url) {
+            window.open(character.avatar_url, '_blank');
+        } else {
+            handleGenerateAvatar();
+        }
+    };
+
+    // 优先使用缩略图，没有则使用原图
+    const displayUrl = character.thumbnail_url
+        ? `${API_BASE}${character.thumbnail_url}`
+        : character.avatar_url;
+    const hasAvatar = displayUrl && !imgError;
+
     return (
         <div className="p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors group">
             <div className="flex items-start gap-2">
-                {/* 头像区域 - 可点击生成 */}
+                {/* 头像区域 - 可点击生成/查看原图 */}
                 <div
                     className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0 relative cursor-pointer overflow-hidden group/avatar"
-                    onClick={handleGenerateAvatar}
-                    title={character.avatar_url ? "点击重新生成头像" : "点击生成 AI 头像"}
+                    onClick={handleAvatarClick}
+                    title={character.avatar_url ? "点击查看原图 (悬停可重新生成)" : "点击生成 AI 头像"}
                 >
                     {isGenerating ? (
                         <div className="animate-spin h-4 w-4 border-2 border-primary border-t-transparent rounded-full" />
-                    ) : character.avatar_url ? (
+                    ) : hasAvatar ? (
                         <>
                             <img
-                                src={character.avatar_url}
+                                src={displayUrl}
                                 alt={character.name}
                                 className="h-full w-full object-cover"
+                                onError={() => setImgError(true)}
                             />
                             <div className="absolute inset-0 bg-black/50 opacity-0 group-hover/avatar:opacity-100 flex items-center justify-center transition-opacity">
                                 <Sparkles className="h-4 w-4 text-white" />

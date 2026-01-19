@@ -45,6 +45,7 @@ class Character(Base):
     position_x: Mapped[float] = mapped_column(Float, default=0.0)
     position_y: Mapped[float] = mapped_column(Float, default=0.0)
     avatar_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    thumbnail_path: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
 

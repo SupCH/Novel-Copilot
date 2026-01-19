@@ -20,18 +20,21 @@ import {
 import "@xyflow/react/dist/style.css";
 import { useAppStore } from "@/store/app-store";
 import { Button } from "@/components/ui/button";
-import { X, ZoomIn, Maximize2, User } from "lucide-react";
+import { X, User } from "lucide-react";
 import { createPortal } from "react-dom";
-import { dataTablesApi, avatarApi } from "@/lib/api";
+import { dataTablesApi, avatarApi, AvatarInfo } from "@/lib/api";
 
 // 头像缓存（与 relationships-table 共享逻辑）
-let graphAvatarCache: Record<string, string> = {};
+let graphAvatarCache: Record<string, AvatarInfo> = {};
 let graphCacheProjectId: number | null = null;
 
-// 自定义节点组件 - 显示角色名和头像
+// API Base URL for thumbnail
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:3506";
+
+// 自定义节点组件 - 显示角色名和头像（优先使用缩略图）
 function CharacterNode({ data, selected }: NodeProps) {
     const { currentProject } = useAppStore();
-    const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+    const [avatarInfo, setAvatarInfo] = useState<AvatarInfo | null>(null);
     const label = data.label as string || "未知";
 
     useEffect(() => {
@@ -39,7 +42,7 @@ function CharacterNode({ data, selected }: NodeProps) {
 
         // 如果缓存是当前项目的，直接使用
         if (graphCacheProjectId === currentProject.id && graphAvatarCache[label]) {
-            setAvatarUrl(graphAvatarCache[label]);
+            setAvatarInfo(graphAvatarCache[label]);
             return;
         }
 
@@ -47,9 +50,9 @@ function CharacterNode({ data, selected }: NodeProps) {
         avatarApi.getAll(currentProject.id).then(avatars => {
             graphAvatarCache = avatars;
             graphCacheProjectId = currentProject.id;
-            setAvatarUrl(avatars[label] || null);
+            setAvatarInfo(avatars[label] || null);
         }).catch(() => {
-            setAvatarUrl(null);
+            setAvatarInfo(null);
         });
     }, [label, currentProject]);
 
@@ -60,13 +63,19 @@ function CharacterNode({ data, selected }: NodeProps) {
             avatarApi.getAll(currentProject.id).then(avatars => {
                 graphAvatarCache = avatars;
                 graphCacheProjectId = currentProject.id;
-                setAvatarUrl(avatars[label] || null);
+                setAvatarInfo(avatars[label] || null);
             }).catch(() => { });
         }, 3000);
         return () => clearInterval(interval);
     }, [label, currentProject]);
 
     const [imgError, setImgError] = useState(false);
+
+    // 优先使用缩略图，没有则使用原图
+    const displayUrl = avatarInfo?.thumbnail_url
+        ? `${API_BASE}${avatarInfo.thumbnail_url}`
+        : avatarInfo?.avatar_url;
+    const hasAvatar = displayUrl && !imgError;
 
     return (
         <div
@@ -93,7 +102,7 @@ function CharacterNode({ data, selected }: NodeProps) {
                     height: "28px",
                     borderRadius: "50%",
                     overflow: "hidden",
-                    border: avatarUrl && !imgError ? "2px solid #3b82f6" : "2px solid #d1d5db",
+                    border: hasAvatar ? "2px solid #3b82f6" : "2px solid #d1d5db",
                     background: "#f3f4f6",
                     display: "flex",
                     alignItems: "center",
@@ -101,9 +110,9 @@ function CharacterNode({ data, selected }: NodeProps) {
                     flexShrink: 0,
                 }}
             >
-                {avatarUrl && !imgError ? (
+                {hasAvatar ? (
                     <img
-                        src={avatarUrl}
+                        src={displayUrl}
                         alt={label}
                         style={{ width: "100%", height: "100%", objectFit: "cover" }}
                         onError={() => setImgError(true)}

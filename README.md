@@ -13,6 +13,7 @@
 - **🤖 AI 智能续写** - 支持 OpenAI API / Ollama 本地模型，流式输出，**自动获取前章摘要保持剧情连贯**
 - **📊 自动数据提取** - AI 自动识别角色、事件、关系并填充数据表
 - **📝 富文本编辑器** - 基于 Tiptap 的沉浸式写作体验
+- **🖼️ 智能头像生成** - 一键生成 AI 角色头像，**自动下载并本地压缩为 540p 缩略图**，提升展示性能
 - **📁 多项目管理** - 每个项目独立 URL（`/project/[id]`），章节目录树，支持拖拽排序
 - **💾 本地存储** - SQLite 数据库，数据完全本地化
 
@@ -127,7 +128,9 @@ Novel-Copilot/
 | `/api/data-tables` | GET/POST | 数据表管理 |
 | `/api/ai/continue` | POST | AI 续写（SSE） |
 | `/api/ai/extract` | POST | AI 数据提取 |
+| `/api/ai/generate-avatar` | POST | 生成 AI 头像（支持缩略图压缩） |
 | `/api/ai/organize-characters` | POST | AI 一键整理人物关系 |
+| `/thumbnails/{path}` | GET | 访问本地压缩后的缩略图 |
 | `/api/data/export/{id}` | GET | 导出项目 |
 | `/api/data/import` | POST | 导入项目 |
 

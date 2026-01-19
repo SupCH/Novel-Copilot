@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useAppStore } from "@/store/app-store";
-import { dataTablesApi, DataTableResponse, avatarApi } from "@/lib/api";
+import { dataTablesApi, DataTableResponse, avatarApi, AvatarInfo } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -13,26 +13,33 @@ import {
     DialogDescription,
     DialogFooter,
 } from "@/components/ui/dialog";
-import { Plus, Trash2, Sparkles, User } from "lucide-react";
+import { Plus, Trash2, Sparkles, User, RefreshCw } from "lucide-react";
 import { CharacterGraph } from "@/components/character-graph";
 
-// 头像缓存 context（全局共享）
-let avatarCache: Record<string, string> = {};
+// 头像缓存 context（全局共享）- 存储 { avatar_url, thumbnail_url }
+let avatarCache: Record<string, AvatarInfo> = {};
 let cacheProjectId: number | null = null;
 
-// 头像显示组件 - 从数据库读取
-function CharacterAvatar({ characterName, projectId }: { characterName: string; projectId: number }) {
-    const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+// API Base URL for thumbnail
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:3506";
+
+// 头像显示组件 - 从数据库读取，使用缩略图显示，点击打开原图
+function CharacterAvatar({ characterName, projectId, onRegenerate }: {
+    characterName: string;
+    projectId: number;
+    onRegenerate?: () => void;
+}) {
+    const [avatarInfo, setAvatarInfo] = useState<AvatarInfo | null>(null);
 
     useEffect(() => {
         if (!characterName.trim()) {
-            setAvatarUrl(null);
+            setAvatarInfo(null);
             return;
         }
 
         // 如果缓存是当前项目的，直接使用
         if (cacheProjectId === projectId && avatarCache[characterName]) {
-            setAvatarUrl(avatarCache[characterName]);
+            setAvatarInfo(avatarCache[characterName]);
             return;
         }
 
@@ -40,9 +47,9 @@ function CharacterAvatar({ characterName, projectId }: { characterName: string; 
         avatarApi.getAll(projectId).then(avatars => {
             avatarCache = avatars;
             cacheProjectId = projectId;
-            setAvatarUrl(avatars[characterName] || null);
+            setAvatarInfo(avatars[characterName] || null);
         }).catch(() => {
-            setAvatarUrl(null);
+            setAvatarInfo(null);
         });
     }, [characterName, projectId]);
 
@@ -53,29 +60,38 @@ function CharacterAvatar({ characterName, projectId }: { characterName: string; 
             avatarApi.getAll(projectId).then(avatars => {
                 avatarCache = avatars;
                 cacheProjectId = projectId;
-                setAvatarUrl(avatars[characterName] || null);
+                setAvatarInfo(avatars[characterName] || null);
             }).catch(() => { });
         }, 3000);
         return () => clearInterval(interval);
     }, [characterName, projectId]);
 
     const handleClick = () => {
-        if (avatarUrl) {
-            window.open(avatarUrl, '_blank');
+        // 点击打开原图 URL
+        if (avatarInfo?.avatar_url) {
+            window.open(avatarInfo.avatar_url, '_blank');
         }
     };
 
     const [imgError, setImgError] = useState(false);
 
+    // 优先使用缩略图，没有缩略图则使用原图
+    const displayUrl = avatarInfo?.thumbnail_url
+        ? `${API_BASE}${avatarInfo.thumbnail_url}`
+        : avatarInfo?.avatar_url;
+    const hasAvatar = displayUrl && !imgError;
+
     return (
         <div
-            className={`h-8 w-8 shrink-0 rounded-full overflow-hidden border-2 ${avatarUrl && !imgError ? 'border-primary cursor-pointer' : 'border-muted'} bg-muted flex items-center justify-center`}
+            className={`h-8 w-8 shrink-0 rounded-full overflow-hidden border-2 relative group
+                ${hasAvatar ? 'border-primary' : 'border-muted'} 
+                bg-muted flex items-center justify-center cursor-pointer`}
             onClick={handleClick}
-            title={avatarUrl && !imgError ? '点击查看头像' : '暂无头像'}
+            title={hasAvatar ? '点击查看原图' : '暂无头像'}
         >
-            {avatarUrl && !imgError ? (
+            {hasAvatar ? (
                 <img
-                    src={avatarUrl}
+                    src={displayUrl}
                     alt={characterName}
                     className="h-full w-full object-cover"
                     onError={() => setImgError(true)}
@@ -83,8 +99,25 @@ function CharacterAvatar({ characterName, projectId }: { characterName: string; 
             ) : (
                 <User className="h-4 w-4 text-muted-foreground" />
             )}
+            {/* 悬停时显示重新生成按钮 */}
+            {hasAvatar && onRegenerate && (
+                <div
+                    className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity"
+                    onClick={(e) => { e.stopPropagation(); onRegenerate(); }}
+                    title="重新生成头像"
+                >
+                    <RefreshCw className="h-4 w-4 text-white" />
+                </div>
+            )}
         </div>
     );
+}
+
+// CharacterAvatar props interface
+interface CharacterAvatarProps {
+    characterName: string;
+    projectId: number;
+    onRegenerate?: () => void;
 }
 
 // 头像生成按钮组件 - 直接使用角色名和数据表信息生成

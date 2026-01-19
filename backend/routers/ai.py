@@ -619,9 +619,12 @@ class GenerateAvatarRequest(BaseModel):
 async def generate_avatar(data: GenerateAvatarRequest, db: AsyncSession = Depends(get_db)):
     """
     为角色生成 AI 头像
-    调用外部图像生成 API，返回生成的图片 URL
+    调用外部图像生成 API，下载原图后本地压缩生成缩略图
     """
     import httpx
+    import os
+    from PIL import Image
+    from io import BytesIO
     
     # 获取角色信息
     result = await db.execute(select(Character).where(Character.id == data.character_id))
@@ -642,8 +645,8 @@ async def generate_avatar(data: GenerateAvatarRequest, db: AsyncSession = Depend
     print(f"[INFO] Generating avatar for {character.name} with prompt: {prompt[:100]}...")
     
     try:
-        # 调用图像生成 API
         async with httpx.AsyncClient(timeout=120.0) as client:
+            # 调用图像生成 API
             response = await client.post(
                 f"{data.image_base_url.rstrip('/')}/images/generations",
                 headers={
@@ -654,7 +657,7 @@ async def generate_avatar(data: GenerateAvatarRequest, db: AsyncSession = Depend
                     "model": data.image_model,
                     "prompt": prompt,
                     "n": 1,
-                    "size": "512x512"
+                    "size": "1024x1024"  # 请求高分辨率原图
                 }
             )
             
@@ -673,15 +676,50 @@ async def generate_avatar(data: GenerateAvatarRequest, db: AsyncSession = Depend
             else:
                 raise HTTPException(status_code=500, detail="No image returned from API")
             
-            # 更新角色头像 URL
+            print(f"[INFO] Original image URL: {image_url[:80]}...")
+            
+            # 下载原图
+            img_response = await client.get(image_url)
+            if img_response.status_code != 200:
+                print(f"[ERROR] Failed to download image: {img_response.status_code}")
+                raise HTTPException(status_code=500, detail="Failed to download generated image")
+            
+            # 使用 Pillow 压缩为 540p 缩略图
+            img = Image.open(BytesIO(img_response.content))
+            
+            # 计算缩放比例，保持宽高比，最大边为 540px
+            max_size = 540
+            ratio = min(max_size / img.width, max_size / img.height)
+            new_size = (int(img.width * ratio), int(img.height * ratio))
+            
+            # 使用高质量缩放
+            thumbnail = img.resize(new_size, Image.Resampling.LANCZOS)
+            
+            # 保存缩略图到本地
+            thumbnails_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "thumbnails")
+            os.makedirs(thumbnails_dir, exist_ok=True)
+            
+            thumbnail_filename = f"{character.id}.jpg"
+            thumbnail_path = os.path.join(thumbnails_dir, thumbnail_filename)
+            
+            # 转换为 RGB（处理 RGBA 图片）并保存为 JPEG
+            if thumbnail.mode in ('RGBA', 'P'):
+                thumbnail = thumbnail.convert('RGB')
+            thumbnail.save(thumbnail_path, "JPEG", quality=85, optimize=True)
+            
+            print(f"[INFO] Thumbnail saved to: {thumbnail_path}")
+            
+            # 更新角色：原图 URL + 缩略图路径
             character.avatar_url = image_url
+            character.thumbnail_path = f"/thumbnails/{thumbnail_filename}"
             await db.commit()
             
-            print(f"[INFO] Avatar generated for {character.name}: {image_url[:50]}...")
+            print(f"[INFO] Avatar generated for {character.name}: original={image_url[:50]}..., thumbnail={character.thumbnail_path}")
             
             return {
                 "success": True,
                 "avatar_url": image_url,
+                "thumbnail_url": character.thumbnail_path,
                 "character_id": character.id,
                 "character_name": character.name
             }

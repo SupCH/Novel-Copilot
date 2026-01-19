@@ -125,11 +125,20 @@ async def save_avatar_by_name(
 
 @router.get("/projects/{project_id}/characters/avatars")
 async def get_avatars(project_id: int, db: AsyncSession = Depends(get_db)):
-    """获取项目所有角色的头像 URL（用于前端缓存）"""
+    """
+    获取项目所有角色的头像 URL（用于前端缓存）
+    返回格式: { 角色名: { thumbnail_url, avatar_url } }
+    """
     result = await db.execute(
-        select(Character.name, Character.avatar_url)
+        select(Character.name, Character.avatar_url, Character.thumbnail_path)
         .where(Character.project_id == project_id)
         .where(Character.avatar_url.isnot(None))
     )
     rows = result.all()
-    return {row[0]: row[1] for row in rows}
+    return {
+        row[0]: {
+            "avatar_url": row[1],
+            "thumbnail_url": row[2]  # 可能为 None（旧数据没有缩略图）
+        }
+        for row in rows
+    }
