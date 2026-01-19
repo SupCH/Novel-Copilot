@@ -13,8 +13,56 @@ import {
     DialogDescription,
     DialogFooter,
 } from "@/components/ui/dialog";
-import { Plus, Trash2, Sparkles } from "lucide-react";
+import { Plus, Trash2, Sparkles, User } from "lucide-react";
 import { CharacterGraph } from "@/components/character-graph";
+
+// 头像显示组件 - 从 localStorage 读取
+function CharacterAvatar({ characterName, projectId }: { characterName: string; projectId: number }) {
+    const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+    const [, forceUpdate] = useState(0);
+
+    useEffect(() => {
+        if (!characterName.trim()) {
+            setAvatarUrl(null);
+            return;
+        }
+        const key = `avatar_${projectId}_${characterName}`;
+        const url = localStorage.getItem(key);
+        setAvatarUrl(url);
+    }, [characterName, projectId]);
+
+    // 监听 localStorage 变化
+    useEffect(() => {
+        const handleStorageChange = () => {
+            if (!characterName.trim()) return;
+            const key = `avatar_${projectId}_${characterName}`;
+            const url = localStorage.getItem(key);
+            setAvatarUrl(url);
+        };
+        const interval = setInterval(handleStorageChange, 1000);
+        return () => clearInterval(interval);
+    }, [characterName, projectId]);
+
+    const handleClick = () => {
+        if (avatarUrl) {
+            window.open(avatarUrl, '_blank');
+        }
+    };
+
+    return (
+        <div
+            className={`h-8 w-8 shrink-0 rounded-full overflow-hidden border-2 ${avatarUrl ? 'border-primary cursor-pointer' : 'border-muted'} bg-muted flex items-center justify-center`}
+            onClick={handleClick}
+            title={avatarUrl ? '点击查看头像' : '暂无头像'}
+        >
+            {avatarUrl ? (
+                <img src={avatarUrl} alt={characterName} className="h-full w-full object-cover" />
+            ) : (
+                <User className="h-4 w-4 text-muted-foreground" />
+            )}
+        </div>
+    );
+}
 
 // 头像生成按钮组件 - 直接使用角色名和数据表信息生成
 function AvatarGenerateButton({
@@ -69,9 +117,14 @@ function AvatarGenerateButton({
             const imageUrl = data.data?.[0]?.url || data.images?.[0]?.url;
 
             if (imageUrl) {
-                // 在新窗口打开图片
-                window.open(imageUrl, '_blank');
-                alert('头像生成成功！已在新窗口打开');
+                // 保存到 localStorage（以角色名为 key）
+                const avatarKey = `avatar_${currentProject.id}_${characterName}`;
+                localStorage.setItem(avatarKey, imageUrl);
+
+                // 提示用户并提供查看选项
+                if (confirm('头像生成成功！点击确定查看图片')) {
+                    window.open(imageUrl, '_blank');
+                }
             } else {
                 throw new Error('未返回图片 URL');
             }
@@ -263,6 +316,12 @@ export function RelationshipsTable() {
                     {table.rows.map((row, rowIndex) => (
                         <div key={rowIndex} className="p-3 rounded-lg border bg-card space-y-2 group">
                             <div className="font-medium text-sm flex gap-2 items-center">
+                                {currentProject && (
+                                    <CharacterAvatar
+                                        characterName={row[0] || ""}
+                                        projectId={currentProject.id}
+                                    />
+                                )}
                                 <Input
                                     value={row[0] || ""}
                                     onChange={(e) => updateCell(rowIndex, 0, e.target.value)}
