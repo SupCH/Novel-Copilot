@@ -19,8 +19,9 @@ import { RelationshipsTable } from "@/components/relationships-table";
 import { OutlinePanel } from "@/components/outline-panel";
 import { useAppStore } from "@/store/app-store";
 import { charactersApi, relationshipsApi, projectsApi } from "@/lib/api";
-import { Settings, Network, Plus, User, Pencil, Table2, BookOpen } from "lucide-react";
+import { Settings, Network, Plus, User, Pencil, Table2, BookOpen, History } from "lucide-react";
 import type { Character } from "@/lib/api";
+import { SnapshotPanel } from "@/components/snapshot-panel";
 
 export function RightPanel() {
     const {
@@ -153,6 +154,15 @@ export function RightPanel() {
                     <BookOpen className="h-4 w-4" />
                     大纲
                 </Button>
+                <Button
+                    variant={rightPanelTab === "history" ? "secondary" : "ghost"}
+                    size="sm"
+                    onClick={() => setRightPanelTab("history")}
+                    className="flex-1 gap-1"
+                >
+                    <History className="h-4 w-4" />
+                    历史
+                </Button>
             </div>
 
             {/* 内容区 */}
@@ -264,6 +274,8 @@ export function RightPanel() {
                     <RelationshipsTable />
                 ) : rightPanelTab === "outline" ? (
                     <OutlinePanel />
+                ) : rightPanelTab === "history" ? (
+                    <SnapshotPanel />
                 ) : (
                     <DataTablesPanel />
                 )}

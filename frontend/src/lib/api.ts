@@ -407,3 +407,43 @@ export const dataTablesApi = {
             method: "DELETE",
         }),
 };
+
+// 快照 API
+export interface Snapshot {
+    id: number;
+    project_id: number;
+    name: string;
+    description: string | null;
+    snapshot_type: string;
+    created_at: string;
+}
+
+export interface SnapshotDetail extends Snapshot {
+    data: {
+        project: Partial<Project>;
+        chapters: Partial<Chapter>[];
+        characters: Partial<Character>[];
+        relationships: Partial<Relationship>[];
+        data_tables: { id: number; table_type: number; rows: Record<number, string>[] }[];
+    };
+}
+
+export const snapshotsApi = {
+    list: (projectId: number) =>
+        request<Snapshot[]>(`/api/snapshots/${projectId}`),
+    create: (data: { project_id: number; name?: string; description?: string; snapshot_type?: string }) =>
+        request<Snapshot>("/api/snapshots/", {
+            method: "POST",
+            body: JSON.stringify(data),
+        }),
+    detail: (snapshotId: number) =>
+        request<SnapshotDetail>(`/api/snapshots/${snapshotId}/detail`),
+    restore: (snapshotId: number) =>
+        request<{ success: boolean; message: string }>(`/api/snapshots/${snapshotId}/restore`, {
+            method: "POST",
+        }),
+    delete: (snapshotId: number) =>
+        request<{ success: boolean; message: string }>(`/api/snapshots/${snapshotId}`, {
+            method: "DELETE",
+        }),
+};

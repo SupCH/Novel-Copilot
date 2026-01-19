@@ -111,3 +111,21 @@ class DataTable(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
 
+
+class Snapshot(Base):
+    """
+    项目快照表 - 存储项目的完整历史版本
+    snapshot_type:
+        "auto" - 自动保存的快照
+        "manual" - 用户手动创建的快照
+    """
+    __tablename__ = "snapshots"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    project_id: Mapped[int] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"), nullable=False)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    snapshot_type: Mapped[str] = mapped_column(String(20), nullable=False, default="manual")
+    # 完整快照数据 (JSON): { project, chapters, characters, relationships, data_tables }
+    data: Mapped[dict] = mapped_column(JSON, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())

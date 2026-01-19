@@ -16,6 +16,7 @@ from routers import (
     ai_router,
     data_io_router,
     data_tables_router,
+    snapshots_router,
 )
 
 
@@ -54,6 +55,7 @@ app.include_router(chapters_router)
 app.include_router(ai_router)
 app.include_router(data_io_router)
 app.include_router(data_tables_router)
+app.include_router(snapshots_router)
 
 
 @app.get("/")

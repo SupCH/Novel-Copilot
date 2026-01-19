@@ -5,6 +5,7 @@ from routers.chapters import router as chapters_router
 from routers.ai import router as ai_router
 from routers.data_io import router as data_io_router
 from routers.data_tables import router as data_tables_router
+from routers.snapshots import router as snapshots_router
 
 __all__ = [
     "projects_router",
@@ -14,5 +15,6 @@ __all__ = [
     "ai_router",
     "data_io_router",
     "data_tables_router",
+    "snapshots_router",
 ]
 
