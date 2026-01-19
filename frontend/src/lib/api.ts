@@ -55,6 +55,7 @@ export interface Character {
     attributes: Record<string, unknown> | null;
     position_x: number;
     position_y: number;
+    avatar_url: string | null;
     created_at: string;
     updated_at: string;
 }
@@ -341,6 +342,32 @@ export const aiApi = {
                 model: data.config?.model || "gpt-4o-mini",
                 api_base: data.config?.baseUrl || undefined,
                 api_key: data.config?.apiKey || undefined,
+            }),
+        });
+    },
+    // 生成角色头像
+    generateAvatar: (data: {
+        characterId: number;
+        imageConfig: {
+            imageBaseUrl: string;
+            imageApiKey: string;
+            imageModel: string;
+        };
+        customPrompt?: string;
+    }) => {
+        return request<{
+            success: boolean;
+            avatar_url: string;
+            character_id: number;
+            character_name: string;
+        }>("/api/ai/generate-avatar", {
+            method: "POST",
+            body: JSON.stringify({
+                character_id: data.characterId,
+                image_base_url: data.imageConfig.imageBaseUrl,
+                image_api_key: data.imageConfig.imageApiKey,
+                image_model: data.imageConfig.imageModel,
+                custom_prompt: data.customPrompt,
             }),
         });
     },

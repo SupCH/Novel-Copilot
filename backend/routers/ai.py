@@ -600,3 +600,96 @@ async def organize_characters(data: OrganizeCharactersRequest, db: AsyncSession 
             "success": False,
             "message": f"整理失败: {str(e)}"
         }
+
+
+# ============ 头像生成 ============
+
+class GenerateAvatarRequest(BaseModel):
+    """头像生成请求"""
+    character_id: int
+    # 图像 API 配置
+    image_base_url: str = "https://api.siliconflow.cn/v1"
+    image_api_key: str
+    image_model: str = "black-forest-labs/FLUX.1-schnell"
+    # 可选：自定义提示词
+    custom_prompt: Optional[str] = None
+
+
+@router.post("/generate-avatar")
+async def generate_avatar(data: GenerateAvatarRequest, db: AsyncSession = Depends(get_db)):
+    """
+    为角色生成 AI 头像
+    调用外部图像生成 API，返回生成的图片 URL
+    """
+    import httpx
+    
+    # 获取角色信息
+    result = await db.execute(select(Character).where(Character.id == data.character_id))
+    character = result.scalar_one_or_none()
+    if not character:
+        raise HTTPException(status_code=404, detail="Character not found")
+    
+    # 构建提示词
+    if data.custom_prompt:
+        prompt = data.custom_prompt
+    else:
+        # 根据角色名和简介自动生成提示词
+        bio_desc = character.bio[:200] if character.bio else ""
+        prompt = f"Portrait of {character.name}, anime style, detailed, high quality"
+        if bio_desc:
+            prompt += f", {bio_desc}"
+    
+    print(f"[INFO] Generating avatar for {character.name} with prompt: {prompt[:100]}...")
+    
+    try:
+        # 调用图像生成 API
+        async with httpx.AsyncClient(timeout=120.0) as client:
+            response = await client.post(
+                f"{data.image_base_url.rstrip('/')}/images/generations",
+                headers={
+                    "Authorization": f"Bearer {data.image_api_key}",
+                    "Content-Type": "application/json"
+                },
+                json={
+                    "model": data.image_model,
+                    "prompt": prompt,
+                    "n": 1,
+                    "size": "512x512"
+                }
+            )
+            
+            if response.status_code != 200:
+                error_detail = response.text
+                print(f"[ERROR] Image API error: {error_detail}")
+                raise HTTPException(status_code=response.status_code, detail=f"Image API error: {error_detail}")
+            
+            result_data = response.json()
+            
+            # 提取图片 URL（兼容不同 API 格式）
+            if "data" in result_data and len(result_data["data"]) > 0:
+                image_url = result_data["data"][0].get("url") or result_data["data"][0].get("b64_json")
+            elif "images" in result_data and len(result_data["images"]) > 0:
+                image_url = result_data["images"][0].get("url")
+            else:
+                raise HTTPException(status_code=500, detail="No image returned from API")
+            
+            # 更新角色头像 URL
+            character.avatar_url = image_url
+            await db.commit()
+            
+            print(f"[INFO] Avatar generated for {character.name}: {image_url[:50]}...")
+            
+            return {
+                "success": True,
+                "avatar_url": image_url,
+                "character_id": character.id,
+                "character_name": character.name
+            }
+            
+    except httpx.TimeoutException:
+        raise HTTPException(status_code=504, detail="Image generation timed out")
+    except Exception as e:
+        print(f"[ERROR] generate_avatar: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))

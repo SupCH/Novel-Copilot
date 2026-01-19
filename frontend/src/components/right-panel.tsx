@@ -18,8 +18,8 @@ import { DataTablesPanel } from "@/components/data-tables-panel";
 import { RelationshipsTable } from "@/components/relationships-table";
 import { OutlinePanel } from "@/components/outline-panel";
 import { useAppStore } from "@/store/app-store";
-import { charactersApi, relationshipsApi, projectsApi } from "@/lib/api";
-import { Settings, Network, Plus, User, Pencil, Table2, BookOpen, History, BarChart3, GitBranch } from "lucide-react";
+import { charactersApi, relationshipsApi, projectsApi, aiApi } from "@/lib/api";
+import { Settings, Network, Plus, User, Pencil, Table2, BookOpen, History, BarChart3, GitBranch, Sparkles } from "lucide-react";
 import type { Character } from "@/lib/api";
 import { SnapshotPanel } from "@/components/snapshot-panel";
 import { CharacterStats } from "@/components/character-stats";
@@ -305,15 +305,72 @@ export function RightPanel() {
 function CharacterCard({
     character,
     onDelete,
+    onAvatarGenerated,
 }: {
     character: Character;
     onDelete: () => void;
+    onAvatarGenerated?: (url: string) => void;
 }) {
+    const { aiConfig } = useAppStore();
+    const [isGenerating, setIsGenerating] = useState(false);
+
+    const handleGenerateAvatar = async () => {
+        if (!aiConfig.imageApiKey) {
+            alert("请先在 AI 设置中配置图像 API Key");
+            return;
+        }
+
+        setIsGenerating(true);
+        try {
+            const result = await aiApi.generateAvatar({
+                characterId: character.id,
+                imageConfig: {
+                    imageBaseUrl: aiConfig.imageBaseUrl,
+                    imageApiKey: aiConfig.imageApiKey,
+                    imageModel: aiConfig.imageModel,
+                },
+            });
+            if (result.success && result.avatar_url) {
+                onAvatarGenerated?.(result.avatar_url);
+            }
+        } catch (error) {
+            console.error("生成头像失败:", error);
+            alert(`生成失败: ${error instanceof Error ? error.message : "未知错误"}`);
+        } finally {
+            setIsGenerating(false);
+        }
+    };
+
     return (
         <div className="p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors group">
             <div className="flex items-start gap-2">
-                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                    <User className="h-4 w-4 text-primary" />
+                {/* 头像区域 - 可点击生成 */}
+                <div
+                    className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0 relative cursor-pointer overflow-hidden group/avatar"
+                    onClick={handleGenerateAvatar}
+                    title={character.avatar_url ? "点击重新生成头像" : "点击生成 AI 头像"}
+                >
+                    {isGenerating ? (
+                        <div className="animate-spin h-4 w-4 border-2 border-primary border-t-transparent rounded-full" />
+                    ) : character.avatar_url ? (
+                        <>
+                            <img
+                                src={character.avatar_url}
+                                alt={character.name}
+                                className="h-full w-full object-cover"
+                            />
+                            <div className="absolute inset-0 bg-black/50 opacity-0 group-hover/avatar:opacity-100 flex items-center justify-center transition-opacity">
+                                <Sparkles className="h-4 w-4 text-white" />
+                            </div>
+                        </>
+                    ) : (
+                        <>
+                            <User className="h-4 w-4 text-primary" />
+                            <div className="absolute inset-0 bg-primary/20 opacity-0 group-hover/avatar:opacity-100 flex items-center justify-center transition-opacity">
+                                <Sparkles className="h-3 w-3 text-primary" />
+                            </div>
+                        </>
+                    )}
                 </div>
                 <div className="flex-1 min-w-0">
                     <p className="font-medium text-sm truncate">{character.name}</p>
