@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useAppStore } from "@/store/app-store";
-import { dataTablesApi, DataTableResponse } from "@/lib/api";
+import { dataTablesApi, DataTableResponse, aiApi, charactersApi } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -13,8 +13,70 @@ import {
     DialogDescription,
     DialogFooter,
 } from "@/components/ui/dialog";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, Sparkles } from "lucide-react";
 import { CharacterGraph } from "@/components/character-graph";
+
+// 头像生成按钮组件
+function AvatarGenerateButton({ characterName }: { characterName: string }) {
+    const { aiConfig, currentProject, characters, refreshCharacters } = useAppStore();
+    const [isGenerating, setIsGenerating] = useState(false);
+
+    const handleGenerate = async () => {
+        if (!characterName.trim() || !currentProject) {
+            alert("请先输入角色名");
+            return;
+        }
+        if (!aiConfig.imageApiKey) {
+            alert("请先在 AI 设置中配置图像 API Key");
+            return;
+        }
+
+        // 查找对应的角色
+        const character = characters.find(c => c.name === characterName);
+        if (!character) {
+            alert(`未找到角色 "${characterName}"，请先在设置页添加角色或使用一键整理`);
+            return;
+        }
+
+        setIsGenerating(true);
+        try {
+            const result = await aiApi.generateAvatar({
+                characterId: character.id,
+                imageConfig: {
+                    imageBaseUrl: aiConfig.imageBaseUrl,
+                    imageApiKey: aiConfig.imageApiKey,
+                    imageModel: aiConfig.imageModel,
+                },
+            });
+            if (result.success) {
+                refreshCharacters(); // 刷新以显示新头像
+                alert(`头像生成成功！`);
+            }
+        } catch (error) {
+            console.error("生成头像失败:", error);
+            alert(`生成失败: ${error instanceof Error ? error.message : "未知错误"}`);
+        } finally {
+            setIsGenerating(false);
+        }
+    };
+
+    return (
+        <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7 shrink-0"
+            onClick={handleGenerate}
+            disabled={isGenerating || !characterName.trim()}
+            title="生成 AI 头像"
+        >
+            {isGenerating ? (
+                <div className="h-3 w-3 animate-spin border-2 border-primary border-t-transparent rounded-full" />
+            ) : (
+                <Sparkles className="h-3 w-3" />
+            )}
+        </Button>
+    );
+}
 
 export function RelationshipsTable() {
     const { currentProject, dataTablesRefreshKey } = useAppStore();
@@ -185,13 +247,14 @@ export function RelationshipsTable() {
                             >
                                 <Trash2 className="h-3 w-3 text-destructive" />
                             </Button>
-                            <div className="font-medium text-sm">
+                            <div className="font-medium text-sm flex gap-2">
                                 <Input
                                     value={row[0] || ""}
                                     onChange={(e) => updateCell(rowIndex, 0, e.target.value)}
                                     placeholder="角色名"
-                                    className="h-7 text-sm font-medium"
+                                    className="h-7 text-sm font-medium flex-1"
                                 />
+                                <AvatarGenerateButton characterName={row[0] || ""} />
                             </div>
                             <div className="grid grid-cols-2 gap-2 text-xs">
                                 <div>
