@@ -13,13 +13,87 @@ import {
     Node,
     Edge,
     Panel,
+    Handle,
+    Position,
+    NodeProps,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { useAppStore } from "@/store/app-store";
 import { Button } from "@/components/ui/button";
-import { X, ZoomIn, Maximize2 } from "lucide-react";
+import { X, ZoomIn, Maximize2, User } from "lucide-react";
 import { createPortal } from "react-dom";
 import { dataTablesApi } from "@/lib/api";
+
+// 自定义节点组件 - 显示角色名和头像
+function CharacterNode({ data, selected }: NodeProps) {
+    const { currentProject } = useAppStore();
+    const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+    const label = data.label as string || "未知";
+
+    useEffect(() => {
+        if (!label || !currentProject) return;
+        const key = `avatar_${currentProject.id}_${label}`;
+        const url = localStorage.getItem(key);
+        setAvatarUrl(url);
+
+        // 监听变化
+        const interval = setInterval(() => {
+            const newUrl = localStorage.getItem(key);
+            if (newUrl !== avatarUrl) {
+                setAvatarUrl(newUrl);
+            }
+        }, 1000);
+        return () => clearInterval(interval);
+    }, [label, currentProject, avatarUrl]);
+
+    return (
+        <div
+            style={{
+                background: selected ? "#3b82f6" : "#ffffff",
+                color: selected ? "#ffffff" : "#1f2937",
+                border: "2px solid #1f2937",
+                borderRadius: "12px",
+                padding: "8px 12px",
+                fontSize: "14px",
+                fontWeight: 500,
+                boxShadow: selected ? "0 4px 12px rgba(0,0,0,0.2)" : "0 2px 6px rgba(0,0,0,0.1)",
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+                minWidth: "80px",
+            }}
+        >
+            <Handle type="target" position={Position.Left} style={{ background: '#555' }} />
+            <span style={{ flex: 1 }}>{label}</span>
+            <div
+                style={{
+                    width: "28px",
+                    height: "28px",
+                    borderRadius: "50%",
+                    overflow: "hidden",
+                    border: avatarUrl ? "2px solid #3b82f6" : "2px solid #d1d5db",
+                    background: "#f3f4f6",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    flexShrink: 0,
+                }}
+            >
+                {avatarUrl ? (
+                    <img src={avatarUrl} alt={label} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                ) : (
+                    <User style={{ width: "14px", height: "14px", color: "#9ca3af" }} />
+                )}
+            </div>
+            <Handle type="source" position={Position.Right} style={{ background: '#555' }} />
+        </div>
+    );
+}
+
+// 自定义节点类型映射
+const nodeTypes = {
+    character: CharacterNode,
+};
 
 interface CharacterGraphProps {
     isOpen?: boolean;
@@ -133,10 +207,9 @@ export function CharacterGraph({ isOpen = true, onClose, embedded = false }: Cha
                     role: char[3] || "",
                     personality: char[2] || "",
                 },
-                type: "default",
-                style: getNodeStyle(false),
+                type: "character",  // 使用自定义节点类型
             })),
-        [characters, positions, getNodeStyle]
+        [characters, positions]
     );
 
     // 将关系转换为边 - 同时去重双向关系
@@ -251,6 +324,7 @@ export function CharacterGraph({ isOpen = true, onClose, embedded = false }: Cha
                 onNodesChange={onNodesChange}
                 onEdgesChange={onEdgesChange}
                 onConnect={onConnect}
+                nodeTypes={nodeTypes}
                 fitView
                 className="bg-background"
             >
@@ -285,6 +359,7 @@ export function CharacterGraph({ isOpen = true, onClose, embedded = false }: Cha
                             onNodesChange={onNodesChange}
                             onEdgesChange={onEdgesChange}
                             onConnect={onConnect}
+                            nodeTypes={nodeTypes}
                             onNodeClick={onNodeClick}
                             fitView
                             className="bg-background"
