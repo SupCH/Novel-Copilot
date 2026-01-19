@@ -54,8 +54,13 @@ interface AppState {
         model: string;
         extractModel: string;
         maxTokens: number;
+        // 图像生成配置
+        imageProvider: 'openai' | 'siliconflow' | 'custom';
+        imageBaseUrl: string;
+        imageApiKey: string;
+        imageModel: string;
     };
-    setAiConfig: (config: { baseUrl: string; apiKey: string; model: string; extractModel: string; maxTokens: number }) => void;
+    setAiConfig: (config: AppState['aiConfig']) => void;
 }
 
 export const useAppStore = create<AppState>()(
@@ -121,6 +126,11 @@ export const useAppStore = create<AppState>()(
                 model: "gpt-4o-mini",
                 extractModel: "",
                 maxTokens: 500,
+                // 图像生成默认配置
+                imageProvider: 'siliconflow',
+                imageBaseUrl: "https://api.siliconflow.cn/v1",
+                imageApiKey: "",
+                imageModel: "black-forest-labs/FLUX.1-schnell",
             },
             setAiConfig: (config) => set({ aiConfig: config }),
         }),

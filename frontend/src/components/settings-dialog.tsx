@@ -31,10 +31,17 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
     const [isTestingModel, setIsTestingModel] = useState(false);
     const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
 
-    // 当 store 更新或对话框打开时，同步状态
+    // 当 store 更新或对话框打开时，同步状态（处理旧配置缺少新字段的情况）
     useEffect(() => {
         if (open) {
-            setConfig(aiConfig);
+            setConfig({
+                ...aiConfig,
+                // 确保图像配置有默认值（兼容旧版本配置）
+                imageProvider: aiConfig.imageProvider || 'siliconflow',
+                imageBaseUrl: aiConfig.imageBaseUrl || 'https://api.siliconflow.cn/v1',
+                imageApiKey: aiConfig.imageApiKey || '',
+                imageModel: aiConfig.imageModel || 'black-forest-labs/FLUX.1-schnell',
+            });
             setCheckStatus("idle");
             setErrorMessage("");
             setTestResult(null);
@@ -299,6 +306,73 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                             <span className="text-sm text-muted-foreground">
                                 字（约 {config.maxTokens} tokens）
                             </span>
+                        </div>
+                    </div>
+
+                    {/* 图像生成设置分隔线 */}
+                    <div className="border-t my-4" />
+                    <div className="text-sm font-medium text-muted-foreground mb-2">
+                        🎨 图像生成设置（角色头像）
+                    </div>
+
+                    <div className="grid grid-cols-4 items-center gap-4">
+                        <Label htmlFor="image-provider" className="text-right">
+                            图像服务
+                        </Label>
+                        <select
+                            id="image-provider"
+                            value={config.imageProvider}
+                            onChange={(e) => setConfig({ ...config, imageProvider: e.target.value as 'openai' | 'siliconflow' | 'custom' })}
+                            className="col-span-3 h-9 rounded-md border border-input bg-background px-3 text-sm"
+                        >
+                            <option value="siliconflow">硅基流动 SiliconFlow</option>
+                            <option value="openai">OpenAI DALL-E</option>
+                            <option value="custom">自定义</option>
+                        </select>
+                    </div>
+
+                    <div className="grid grid-cols-4 items-center gap-4">
+                        <Label htmlFor="image-base-url" className="text-right">
+                            图像API地址
+                        </Label>
+                        <Input
+                            id="image-base-url"
+                            value={config.imageBaseUrl}
+                            onChange={(e) => setConfig({ ...config, imageBaseUrl: e.target.value })}
+                            className="col-span-3"
+                            placeholder="https://api.siliconflow.cn/v1"
+                        />
+                    </div>
+
+                    <div className="grid grid-cols-4 items-center gap-4">
+                        <Label htmlFor="image-api-key" className="text-right">
+                            图像API Key
+                        </Label>
+                        <Input
+                            id="image-api-key"
+                            type="password"
+                            value={config.imageApiKey}
+                            onChange={(e) => setConfig({ ...config, imageApiKey: e.target.value })}
+                            className="col-span-3"
+                            placeholder="sk-..."
+                        />
+                    </div>
+
+                    <div className="grid grid-cols-4 items-center gap-4">
+                        <Label htmlFor="image-model" className="text-right">
+                            图像模型
+                        </Label>
+                        <div className="col-span-3">
+                            <Input
+                                id="image-model"
+                                value={config.imageModel}
+                                onChange={(e) => setConfig({ ...config, imageModel: e.target.value })}
+                                placeholder="black-forest-labs/FLUX.1-schnell"
+                            />
+                            <p className="text-xs text-muted-foreground mt-1">
+                                {config.imageProvider === 'siliconflow' ? '推荐: FLUX.1-schnell (快速) 或 Kolors' :
+                                    config.imageProvider === 'openai' ? '推荐: dall-e-3' : '输入模型名称'}
+                            </p>
                         </div>
                     </div>
                 </div>
