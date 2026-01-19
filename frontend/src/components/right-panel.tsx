@@ -165,6 +165,15 @@ export function RightPanel() {
                     <History className="h-4 w-4" />
                     历史
                 </Button>
+                <Button
+                    variant={rightPanelTab === "stats" ? "secondary" : "ghost"}
+                    size="sm"
+                    onClick={() => setRightPanelTab("stats")}
+                    className="flex-1 gap-1"
+                >
+                    <BarChart3 className="h-4 w-4" />
+                    统计
+                </Button>
             </div>
 
             {/* 内容区 */}
@@ -273,19 +282,18 @@ export function RightPanel() {
                         </div>
                     </ScrollArea>
                 ) : rightPanelTab === "graph" ? (
-                    <ScrollArea className="h-full">
-                        <RelationshipsTable />
-                        <div className="border-t">
-                            <CharacterStats />
-                        </div>
-                        <div className="border-t">
-                            <RelationshipTimeline />
-                        </div>
-                    </ScrollArea>
+                    <RelationshipsTable />
                 ) : rightPanelTab === "outline" ? (
                     <OutlinePanel />
                 ) : rightPanelTab === "history" ? (
                     <SnapshotPanel />
+                ) : rightPanelTab === "stats" ? (
+                    <ScrollArea className="h-full">
+                        <CharacterStats />
+                        <div className="border-t">
+                            <RelationshipTimeline />
+                        </div>
+                    </ScrollArea>
                 ) : (
                     <DataTablesPanel />
                 )}
