@@ -5,7 +5,7 @@ import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
 import { useAppStore } from "@/store/app-store";
-import { chaptersApi, aiApi, dataTablesApi } from "@/lib/api";
+import { chaptersApi, aiApi, dataTablesApi, avatarApi } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Sparkles, Save, Check, RefreshCw, X, FileText, Undo2 } from "lucide-react";
 import { ContextMenu, getEditorContextMenuItems } from "@/components/context-menu";
@@ -152,17 +152,23 @@ export function NovelEditor() {
     const loadCharacterData = useCallback(async (name: string, x: number, y: number) => {
         if (!currentProject) return;
         try {
-            const tables = await dataTablesApi.list(currentProject.id);
+            // 同时获取表格数据和头像数据
+            const [tables, avatars] = await Promise.all([
+                dataTablesApi.list(currentProject.id),
+                avatarApi.getAll(currentProject.id)
+            ]);
+
             const charactersTable = tables.find((t: { table_type: number }) => t.table_type === 1);
             const relationshipsTable = tables.find((t: { table_type: number }) => t.table_type === 2);
 
             if (charactersTable) {
                 const row = charactersTable.rows.find((r: Record<number, string>) => r[0] === name);
                 if (row) {
+                    const charAvatar = avatars[name] || { avatar_url: "", thumbnail_url: "" };
                     const charData: CharacterData = {
                         name: row[0] || name,
-                        avatar_url: row[8] || "",
-                        thumbnail_url: row[9] || "",
+                        avatar_url: charAvatar.avatar_url,
+                        thumbnail_url: charAvatar.thumbnail_url || "",
                         traits: row[1] || "",
                         personality: row[2] || "",
                         role: row[3] || "",
