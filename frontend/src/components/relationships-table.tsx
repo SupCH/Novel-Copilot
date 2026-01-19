@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useAppStore } from "@/store/app-store";
-import { dataTablesApi, DataTableResponse, aiApi, charactersApi } from "@/lib/api";
+import { dataTablesApi, DataTableResponse, avatarApi } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -16,30 +16,46 @@ import {
 import { Plus, Trash2, Sparkles, User } from "lucide-react";
 import { CharacterGraph } from "@/components/character-graph";
 
-// 头像显示组件 - 从 localStorage 读取
+// 头像缓存 context（全局共享）
+let avatarCache: Record<string, string> = {};
+let cacheProjectId: number | null = null;
+
+// 头像显示组件 - 从数据库读取
 function CharacterAvatar({ characterName, projectId }: { characterName: string; projectId: number }) {
     const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
-    const [, forceUpdate] = useState(0);
 
     useEffect(() => {
         if (!characterName.trim()) {
             setAvatarUrl(null);
             return;
         }
-        const key = `avatar_${projectId}_${characterName}`;
-        const url = localStorage.getItem(key);
-        setAvatarUrl(url);
+
+        // 如果缓存是当前项目的，直接使用
+        if (cacheProjectId === projectId && avatarCache[characterName]) {
+            setAvatarUrl(avatarCache[characterName]);
+            return;
+        }
+
+        // 从数据库加载所有头像
+        avatarApi.getAll(projectId).then(avatars => {
+            avatarCache = avatars;
+            cacheProjectId = projectId;
+            setAvatarUrl(avatars[characterName] || null);
+        }).catch(() => {
+            setAvatarUrl(null);
+        });
     }, [characterName, projectId]);
 
-    // 监听 localStorage 变化
+    // 定时刷新缓存
     useEffect(() => {
-        const handleStorageChange = () => {
-            if (!characterName.trim()) return;
-            const key = `avatar_${projectId}_${characterName}`;
-            const url = localStorage.getItem(key);
-            setAvatarUrl(url);
-        };
-        const interval = setInterval(handleStorageChange, 1000);
+        const interval = setInterval(() => {
+            if (!projectId) return;
+            avatarApi.getAll(projectId).then(avatars => {
+                avatarCache = avatars;
+                cacheProjectId = projectId;
+                setAvatarUrl(avatars[characterName] || null);
+            }).catch(() => { });
+        }, 3000);
         return () => clearInterval(interval);
     }, [characterName, projectId]);
 
@@ -117,12 +133,14 @@ function AvatarGenerateButton({
             const imageUrl = data.data?.[0]?.url || data.images?.[0]?.url;
 
             if (imageUrl) {
-                // 保存到 localStorage（以角色名为 key）
-                const avatarKey = `avatar_${currentProject.id}_${characterName}`;
-                localStorage.setItem(avatarKey, imageUrl);
+                // 保存到数据库
+                await avatarApi.save(currentProject.id, characterName, imageUrl);
+
+                // 更新本地缓存
+                avatarCache[characterName] = imageUrl;
 
                 // 提示用户并提供查看选项
-                if (confirm('头像生成成功！点击确定查看图片')) {
+                if (confirm('头像生成成功！已保存到数据库。点击确定查看图片')) {
                     window.open(imageUrl, '_blank');
                 }
             } else {

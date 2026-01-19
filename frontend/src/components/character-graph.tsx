@@ -22,7 +22,11 @@ import { useAppStore } from "@/store/app-store";
 import { Button } from "@/components/ui/button";
 import { X, ZoomIn, Maximize2, User } from "lucide-react";
 import { createPortal } from "react-dom";
-import { dataTablesApi } from "@/lib/api";
+import { dataTablesApi, avatarApi } from "@/lib/api";
+
+// 头像缓存（与 relationships-table 共享逻辑）
+let graphAvatarCache: Record<string, string> = {};
+let graphCacheProjectId: number | null = null;
 
 // 自定义节点组件 - 显示角色名和头像
 function CharacterNode({ data, selected }: NodeProps) {
@@ -32,19 +36,35 @@ function CharacterNode({ data, selected }: NodeProps) {
 
     useEffect(() => {
         if (!label || !currentProject) return;
-        const key = `avatar_${currentProject.id}_${label}`;
-        const url = localStorage.getItem(key);
-        setAvatarUrl(url);
 
-        // 监听变化
+        // 如果缓存是当前项目的，直接使用
+        if (graphCacheProjectId === currentProject.id && graphAvatarCache[label]) {
+            setAvatarUrl(graphAvatarCache[label]);
+            return;
+        }
+
+        // 从数据库加载所有头像
+        avatarApi.getAll(currentProject.id).then(avatars => {
+            graphAvatarCache = avatars;
+            graphCacheProjectId = currentProject.id;
+            setAvatarUrl(avatars[label] || null);
+        }).catch(() => {
+            setAvatarUrl(null);
+        });
+    }, [label, currentProject]);
+
+    // 定时刷新
+    useEffect(() => {
+        if (!currentProject) return;
         const interval = setInterval(() => {
-            const newUrl = localStorage.getItem(key);
-            if (newUrl !== avatarUrl) {
-                setAvatarUrl(newUrl);
-            }
-        }, 1000);
+            avatarApi.getAll(currentProject.id).then(avatars => {
+                graphAvatarCache = avatars;
+                graphCacheProjectId = currentProject.id;
+                setAvatarUrl(avatars[label] || null);
+            }).catch(() => { });
+        }, 3000);
         return () => clearInterval(interval);
-    }, [label, currentProject, avatarUrl]);
+    }, [label, currentProject]);
 
     return (
         <div

@@ -474,3 +474,16 @@ export const snapshotsApi = {
             method: "DELETE",
         }),
 };
+
+// 头像 API
+export const avatarApi = {
+    // 保存头像 URL 到数据库
+    save: (projectId: number, name: string, avatarUrl: string) =>
+        request<{ success: boolean; character_id: number; avatar_url: string }>(
+            `/api/projects/${projectId}/characters/save-avatar?name=${encodeURIComponent(name)}&avatar_url=${encodeURIComponent(avatarUrl)}`,
+            { method: "POST" }
+        ),
+    // 获取所有头像 URL
+    getAll: (projectId: number) =>
+        request<Record<string, string>>(`/api/projects/${projectId}/characters/avatars`),
+};

@@ -78,3 +78,58 @@ async def delete_character(character_id: int, db: AsyncSession = Depends(get_db)
         raise HTTPException(status_code=404, detail="Character not found")
     
     await db.delete(character)
+
+
+@router.post("/projects/{project_id}/characters/save-avatar")
+async def save_avatar_by_name(
+    project_id: int,
+    name: str,
+    avatar_url: str,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    按角色名保存头像 URL
+    如果角色不存在，则自动创建
+    """
+    # 检查项目是否存在
+    project = await db.execute(select(Project).where(Project.id == project_id))
+    if not project.scalar_one_or_none():
+        raise HTTPException(status_code=404, detail="Project not found")
+    
+    # 查找或创建角色
+    result = await db.execute(
+        select(Character).where(
+            Character.project_id == project_id,
+            Character.name == name
+        )
+    )
+    character = result.scalar_one_or_none()
+    
+    if character:
+        # 更新现有角色的头像
+        character.avatar_url = avatar_url
+    else:
+        # 创建新角色
+        character = Character(
+            project_id=project_id,
+            name=name,
+            avatar_url=avatar_url
+        )
+        db.add(character)
+    
+    await db.flush()
+    await db.refresh(character)
+    
+    return {"success": True, "character_id": character.id, "avatar_url": avatar_url}
+
+
+@router.get("/projects/{project_id}/characters/avatars")
+async def get_avatars(project_id: int, db: AsyncSession = Depends(get_db)):
+    """获取项目所有角色的头像 URL（用于前端缓存）"""
+    result = await db.execute(
+        select(Character.name, Character.avatar_url)
+        .where(Character.project_id == project_id)
+        .where(Character.avatar_url.isnot(None))
+    )
+    rows = result.all()
+    return {row[0]: row[1] for row in rows}
