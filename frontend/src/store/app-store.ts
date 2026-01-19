@@ -47,6 +47,10 @@ interface AppState {
     dataTablesRefreshKey: number;
     refreshDataTables: () => void;
 
+    // 角色/关系刷新触发器
+    charactersRefreshKey: number;
+    refreshCharacters: () => void;
+
     // AI 配置
     aiConfig: {
         baseUrl: string;
@@ -118,6 +122,10 @@ export const useAppStore = create<AppState>()(
             // 数据表刷新触发器
             dataTablesRefreshKey: 0,
             refreshDataTables: () => set((state) => ({ dataTablesRefreshKey: state.dataTablesRefreshKey + 1 })),
+
+            // 角色/关系刷新触发器
+            charactersRefreshKey: 0,
+            refreshCharacters: () => set((state) => ({ charactersRefreshKey: state.charactersRefreshKey + 1 })),
 
             // 默认连接本地 Ollama
             aiConfig: {

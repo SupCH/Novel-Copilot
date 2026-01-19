@@ -35,6 +35,7 @@ export function RightPanel() {
         setRelationships,
         rightPanelTab,
         setRightPanelTab,
+        charactersRefreshKey,
     } = useAppStore();
 
     const [newCharName, setNewCharName] = useState("");
@@ -47,13 +48,13 @@ export function RightPanel() {
     const [editWorldView, setEditWorldView] = useState("");
     const [editPerspective, setEditPerspective] = useState("third");
 
-    // 加载角色和关系
+    // 加载角色和关系（项目切换或刷新触发时）
     useEffect(() => {
         if (currentProject) {
             charactersApi.list(currentProject.id).then(setCharacters);
             relationshipsApi.list(currentProject.id).then(setRelationships);
         }
-    }, [currentProject, setCharacters, setRelationships]);
+    }, [currentProject, setCharacters, setRelationships, charactersRefreshKey]);
 
     const handleCreateCharacter = async () => {
         if (!currentProject || !newCharName.trim()) return;
@@ -380,14 +381,27 @@ function CharacterCard({
                         </p>
                     )}
                 </div>
-                <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-6 w-6 opacity-0 group-hover:opacity-100"
-                    onClick={onDelete}
-                >
-                    ×
-                </Button>
+                <div className="flex gap-1 opacity-0 group-hover:opacity-100">
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6"
+                        onClick={handleGenerateAvatar}
+                        disabled={isGenerating}
+                        title="生成 AI 头像"
+                    >
+                        <Sparkles className="h-3 w-3" />
+                    </Button>
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6"
+                        onClick={onDelete}
+                        title="删除角色"
+                    >
+                        ×
+                    </Button>
+                </div>
             </div>
         </div>
     );

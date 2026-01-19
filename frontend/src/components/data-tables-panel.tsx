@@ -18,7 +18,7 @@ import { CharacterGraph } from "@/components/character-graph";
 import { ChapterSelectDialog } from "@/components/chapter-select-dialog";
 
 export function DataTablesPanel() {
-    const { currentProject, currentChapter, chapters, aiConfig, dataTablesRefreshKey, refreshDataTables } = useAppStore();
+    const { currentProject, currentChapter, chapters, aiConfig, dataTablesRefreshKey, refreshDataTables, refreshCharacters } = useAppStore();
     const [tables, setTables] = useState<DataTableResponse[]>([]);
     const [expandedTables, setExpandedTables] = useState<Set<number>>(new Set([1, 2]));
     const [loading, setLoading] = useState(false);
@@ -541,6 +541,7 @@ export function DataTablesPanel() {
                                 config: aiConfig,
                             });
                             refreshDataTables();
+                            refreshCharacters(); // 刷新角色列表以更新统计面板
                             setOrganizeResult({ success: result.success, message: result.message });
                         } catch (error) {
                             console.error('Organize error:', error);
