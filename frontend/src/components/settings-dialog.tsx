@@ -423,11 +423,14 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                                             setConfig(prev => ({ ...prev, imageModel: imgModels[0] }));
                                         }
                                     } catch (error) {
-                                        // 404 表示 API 不支持模型列表，这是正常的
                                         const errMsg = error instanceof Error ? error.message : "连接失败";
+                                        // 404 或 Connection error 都表示 API 可能不支持模型列表
                                         if (errMsg.includes("404") || errMsg.includes("Not Found")) {
                                             setImageCheckStatus("success");
                                             setImageErrorMessage("此 API 不支持模型列表，请手动输入");
+                                        } else if (errMsg.toLowerCase().includes("connection") || errMsg.toLowerCase().includes("network") || errMsg.toLowerCase().includes("fetch")) {
+                                            setImageCheckStatus("success");
+                                            setImageErrorMessage("无法获取模型列表，请手动输入模型名");
                                         } else {
                                             setImageCheckStatus("error");
                                             setImageErrorMessage(errMsg);
